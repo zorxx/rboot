@@ -140,18 +140,6 @@ typedef struct {
 } rboot_rtc_data;
 #endif
 
-// override function to create default config, must be placed after type
-// and constant defines as it uses some of them, flashsize is the used size
-// (may be smaller than actual flash size if big flash mode is not enabled,
-// or just plain wrong if the device has not been programmed correctly!)
-#ifdef BOOT_CUSTOM_DEFAULT_CONFIG
-static uint8 default_config(rboot_config *romconf, uint32 flashsize) {
-	romconf->count = 2;
-	romconf->roms[0] = SECTOR_SIZE * (BOOT_CONFIG_SECTOR + 1);
-	romconf->roms[1] = (flashsize / 2) + (SECTOR_SIZE * (BOOT_CONFIG_SECTOR + 1));
-}
-#endif
-
 #ifdef __cplusplus
 }
 #endif

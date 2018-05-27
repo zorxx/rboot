@@ -252,13 +252,34 @@ static uint8 calc_chksum(uint8 *start, uint8 *end) {
 }
 #endif
 
-#ifndef BOOT_CUSTOM_DEFAULT_CONFIG
+#ifndef BOOT_DEFAULT_CONFIG_IMAGE_COUNT
+#define BOOT_DEFAULT_CONFIG_IMAGE_COUNT 2
+#endif
+
+#ifndef BOOT_DEFAULT_CONFIG_ROM0
+#define BOOT_DEFAULT_CONFIG_ROM0 (SECTOR_SIZE * (BOOT_CONFIG_SECTOR + 1))
+#endif
+
+#ifndef BOOT_DEFAULT_CONFIG_ROM1
+#define BOOT_DEFAULT_CONFIG_ROM1 ((flashsize / 2) + (SECTOR_SIZE * (BOOT_CONFIG_SECTOR + 1)))
+#endif
+
+#ifndef BOOT_DEFAULT_CONFIG_ROM2
+#define BOOT_DEFAULT_CONFIG_ROM2 0
+#endif
+
+#ifndef BOOT_DEFAULT_CONFIG_ROM3
+#define BOOT_DEFAULT_CONFIG_ROM3 0
+#endif
+
 // populate the user fields of the default config
 // created on first boot or in case of corruption
 static uint8 default_config(rboot_config *romconf, uint32 flashsize) {
-	romconf->count = 2;
-	romconf->roms[0] = SECTOR_SIZE * (BOOT_CONFIG_SECTOR + 1);
-	romconf->roms[1] = (flashsize / 2) + (SECTOR_SIZE * (BOOT_CONFIG_SECTOR + 1));
+	romconf->count =  BOOT_DEFAULT_CONFIG_IMAGE_COUNT;
+	romconf->roms[0] = BOOT_DEFAULT_CONFIG_ROM0;
+	romconf->roms[1] = BOOT_DEFAULT_CONFIG_ROM1;
+	romconf->roms[2] = BOOT_DEFAULT_CONFIG_ROM2;
+	romconf->roms[3] = BOOT_DEFAULT_CONFIG_ROM3;
 #ifdef BOOT_GPIO_ENABLED
 	romconf->mode = MODE_GPIO_ROM;
 #endif
@@ -266,7 +287,6 @@ static uint8 default_config(rboot_config *romconf, uint32 flashsize) {
 	romconf->mode = MODE_GPIO_SKIP;
 #endif
 }
-#endif
 
 // prevent this function being placed inline with main
 // to keep main's stack size as small as possible
