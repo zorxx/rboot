@@ -38,6 +38,12 @@ usercode* NOINLINE load_rom(uint32 readpos) {
 		// get section address and length
 		writepos = section.address;
 		remaining = section.length;
+
+		if(0 == writepos)
+		{
+			readpos += remaining;
+			continue;
+		}
 		
 		while (remaining > 0) {
 			// work out how much to read, up to 16 bytes at a time

@@ -75,7 +75,7 @@ extern "C" {
 #define CHKSUM_INIT 0xef
 
 #define SECTOR_SIZE 0x1000
-#define BOOT_CONFIG_SECTOR 1
+#define BOOT_CONFIG_SECTOR 2
 
 #define BOOT_CONFIG_MAGIC 0xe1
 #define BOOT_CONFIG_VERSION 0x01

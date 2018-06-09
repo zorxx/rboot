@@ -9,16 +9,10 @@
 
 #ifdef BOOT_BIG_FLASH
 
-// plain sdk defaults to iram
-#ifndef IRAM_ATTR
-#define IRAM_ATTR
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-extern void Cache_Read_Disable(void);
 extern uint32 SPIRead(uint32, void*, uint32);
 extern void ets_printf(const char*, ...);
 extern void Cache_Read_Enable(uint32, uint32, uint32);
@@ -27,7 +21,7 @@ uint8 rBoot_mmap_1 = 0xff;
 uint8 rBoot_mmap_2 = 0xff;
 
 // this function must remain in iram
-void IRAM_ATTR Cache_Read_Enable_New(void) {
+void __attribute__((section(".iram.text"))) Cache_Read_Enable_New(void) {
 	
 	if (rBoot_mmap_1 == 0xff) {
 		uint32 val;
@@ -63,7 +57,7 @@ void IRAM_ATTR Cache_Read_Enable_New(void) {
 		rBoot_mmap_2 = val / 2;
 		rBoot_mmap_1 = val % 2;
 		
-		//ets_printf("mmap %d,%d,1\r\n", rBoot_mmap_1, rBoot_mmap_2);
+		ets_printf("mmap %d,%d,1\r\n", rBoot_mmap_1, rBoot_mmap_2);
 	}
 	
 	Cache_Read_Enable(rBoot_mmap_1, rBoot_mmap_2, 1);

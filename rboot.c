@@ -36,30 +36,13 @@ static uint32 check_image(uint32 readpos) {
 	}
 
 	// check header type
-	if (header->magic == ROM_MAGIC) {
+	if (header->magic == ROM_MAGIC
+	||  header->magic == ROM_MAGIC_NEW1
+        ||  header->magic == ROM_MAGIC_NEW2) {
 		// old type, no extra header or irom section to skip over
 		romaddr = readpos;
 		readpos += sizeof(rom_header);
 		sectcount = header->count;
-	} else if (header->magic == ROM_MAGIC_NEW1 && header->count == ROM_MAGIC_NEW2) {
-		// new type, has extra header and irom section first
-		romaddr = readpos + header->len + sizeof(rom_header_new);
-#ifdef BOOT_IROM_CHKSUM
-		// we will set the real section count later, when we read the header
-		sectcount = 0xff;
-		// just skip the first part of the header
-		// rest is processed for the chksum
-		readpos += sizeof(rom_header);
-#else
-		// skip the extra header and irom section
-		readpos = romaddr;
-		// read the normal header that follows
-		if (SPIRead(readpos, header, sizeof(rom_header)) != 0) {
-			return 0;
-		}
-		sectcount = header->count;
-		readpos += sizeof(rom_header);
-#endif
 	} else {
 		return 0;
 	}
@@ -92,18 +75,6 @@ static uint32 check_image(uint32 readpos) {
 				chksum ^= buffer[loop];
 			}
 		}
-
-#ifdef BOOT_IROM_CHKSUM
-		if (sectcount == 0xff) {
-			// just processed the irom section, now
-			// read the normal header that follows
-			if (SPIRead(readpos, header, sizeof(rom_header)) != 0) {
-				return 0;
-			}
-			sectcount = header->count + 1;
-			readpos += sizeof(rom_header);
-		}
-#endif
 	}
 
 	// round up to next 16 and get checksum
@@ -326,84 +297,81 @@ uint32 NOINLINE find_image(void) {
 	ets_delay_us(BOOT_DELAY_MICROS);
 #endif
 
-	ets_printf("\r\nrBoot v1.4.2 - richardaburton@gmail.com\r\n");
+	ets_printf("\r\n\r\nrBoot v2.0.0 - richardaburton@gmail.com, zorxx@zorxx.com\r\n");
 
 	// read rom header
 	SPIRead(0, header, sizeof(rom_header));
 
 	// print and get flash size
-	ets_printf("Flash Size:   ");
+	ets_printf("Flash: ");
 	flag = header->flags2 >> 4;
 	if (flag == 0) {
-		ets_printf("4 Mbit\r\n");
+		ets_printf("4");
 		flashsize = 0x80000;
 	} else if (flag == 1) {
-		ets_printf("2 Mbit\r\n");
+		ets_printf("2");
 		flashsize = 0x40000;
 	} else if (flag == 2) {
-		ets_printf("8 Mbit\r\n");
+		ets_printf("8");
 		flashsize = 0x100000;
 	} else if (flag == 3) {
-		ets_printf("16 Mbit\r\n");
+		ets_printf("16");
 #ifdef BOOT_BIG_FLASH
 		flashsize = 0x200000;
 #else
 		flashsize = 0x100000; // limit to 8Mbit
 #endif
 	} else if (flag == 4) {
-		ets_printf("32 Mbit\r\n");
+		ets_printf("32");
 #ifdef BOOT_BIG_FLASH
 		flashsize = 0x400000;
 #else
 		flashsize = 0x100000; // limit to 8Mbit
 #endif
 	} else {
-		ets_printf("unknown\r\n");
+		ets_printf("unknown");
 		// assume at least 4mbit
 		flashsize = 0x80000;
 	}
+        ets_printf(" Mbit, ");
 
 	// print spi mode
-	ets_printf("Flash Mode:   ");
 	if (header->flags1 == 0) {
-		ets_printf("QIO\r\n");
+		ets_printf("QIO, ");
 	} else if (header->flags1 == 1) {
-		ets_printf("QOUT\r\n");
+		ets_printf("QOUT, ");
 	} else if (header->flags1 == 2) {
-		ets_printf("DIO\r\n");
+		ets_printf("DIO, ");
 	} else if (header->flags1 == 3) {
-		ets_printf("DOUT\r\n");
+		ets_printf("DOUT, ");
 	} else {
-		ets_printf("unknown\r\n");
+		ets_printf("unknown mode, ");
 	}
 
 	// print spi speed
-	ets_printf("Flash Speed:  ");
 	flag = header->flags2 & 0x0f;
-	if (flag == 0) ets_printf("40 MHz\r\n");
-	else if (flag == 1) ets_printf("26.7 MHz\r\n");
-	else if (flag == 2) ets_printf("20 MHz\r\n");
-	else if (flag == 0x0f) ets_printf("80 MHz\r\n");
-	else ets_printf("unknown\r\n");
+	if (flag == 0) ets_printf("40");
+	else if (flag == 1) ets_printf("26.7");
+	else if (flag == 2) ets_printf("20");
+	else if (flag == 0x0f) ets_printf("80");
+	else ets_printf("unknown speed");
+        ets_printf(" MHz\r\nOption: ");
 
 	// print enabled options
 #ifdef BOOT_BIG_FLASH
-	ets_printf("rBoot Option: Big flash\r\n");
+	ets_printf("big_flash ");
 #endif
 #ifdef BOOT_CONFIG_CHKSUM
-	ets_printf("rBoot Option: Config chksum\r\n");
+	ets_printf("config_chksum ");
 #endif
 #ifdef BOOT_GPIO_ENABLED
-	ets_printf("rBoot Option: GPIO rom mode (%d)\r\n", BOOT_GPIO_NUM);
+	ets_printf("gpio_rom_mode(%d) ", BOOT_GPIO_NUM);
 #endif
 #ifdef BOOT_GPIO_SKIP_ENABLED
-	ets_printf("rBoot Option: GPIO skip mode (%d)\r\n", BOOT_GPIO_NUM);
+	ets_printf("gpio_skip_mode(%d) ", BOOT_GPIO_NUM);
 #endif
 #ifdef BOOT_RTC_ENABLED
-	ets_printf("rBoot Option: RTC data\r\n");
-#endif
-#ifdef BOOT_IROM_CHKSUM
-	ets_printf("rBoot Option: irom chksum\r\n");
+	ets_printf("rtc_data ");
 #endif
 	ets_printf("\r\n");
 
@@ -439,10 +407,10 @@ uint32 NOINLINE find_image(void) {
 
 		if (rtc.next_mode & MODE_TEMP_ROM) {
 			if (rtc.temp_rom >= romconf->count) {
-				ets_printf("Invalid temp rom selected.\r\n");
+				ets_printf("Invalid temp ROM selected.\r\n");
 				return 0;
 			}
-			ets_printf("Booting temp rom.\r\n");
+			ets_printf("Booting temp ROM.\r\n");
 			temp_boot = TRUE;
 			romToBoot = rtc.temp_rom;
 		}
@@ -453,10 +421,10 @@ uint32 NOINLINE find_image(void) {
 	if (perform_gpio_boot(romconf)) {
 #if defined(BOOT_GPIO_ENABLED)
 		if (romconf->gpio_rom >= romconf->count) {
-			ets_printf("Invalid GPIO rom selected.\r\n");
+			ets_printf("Invalid GPIO ROM selected.\r\n");
 			return 0;
 		}
-		ets_printf("Booting GPIO-selected rom.\r\n");
+		ets_printf("Booting GPIO-selected ROM.\r\n");
 		romToBoot = romconf->gpio_rom;
 		gpio_boot = TRUE;
 #elif defined(BOOT_GPIO_SKIP_ENABLED)
@@ -480,7 +448,7 @@ uint32 NOINLINE find_image(void) {
 	// gpio/temp boots will have already validated this
 	if (romconf->current_rom >= romconf->count) {
 		// if invalid rom selected try rom 0
-		ets_printf("Invalid rom selected, defaulting to 0.\r\n");
+		ets_printf("Invalid ROM selected, defaulting to 0.\r\n");
 		romToBoot = 0;
 		romconf->current_rom = 0;
 		updateConfig = TRUE;
@@ -492,14 +460,14 @@ uint32 NOINLINE find_image(void) {
 #ifdef BOOT_GPIO_ENABLED
 	if (gpio_boot && runAddr == 0) {
 		// don't switch to backup for gpio-selected rom
-		ets_printf("GPIO boot rom (%d) is bad.\r\n", romToBoot);
+		ets_printf("GPIO boot ROM (%d) is bad.\r\n", romToBoot);
 		return 0;
 	}
 #endif
 #ifdef BOOT_RTC_ENABLED
 	if (temp_boot && runAddr == 0) {
 		// don't switch to backup for temp rom
-		ets_printf("Temp boot rom (%d) is bad.\r\n", romToBoot);
+		ets_printf("Temp boot ROM (%d) is bad.\r\n", romToBoot);
 		// make sure rtc temp boot mode doesn't persist
 		rtc.next_mode = MODE_STANDARD;
 		rtc.chksum = calc_chksum((uint8*)&rtc, (uint8*)&rtc.chksum);
@@ -510,7 +478,7 @@ uint32 NOINLINE find_image(void) {
 
 	// check we have a good rom
 	while (runAddr == 0) {
-		ets_printf("Rom %d is bad.\r\n", romToBoot);
+		ets_printf("ROM %d (0x%08x) is bad.\r\n", romToBoot, romconf->roms[romToBoot]);
 		// for normal mode try each previous rom
 		// until we find a good one or run out
 		updateConfig = TRUE;
@@ -518,7 +486,7 @@ uint32 NOINLINE find_image(void) {
 		if (romToBoot < 0) romToBoot = romconf->count - 1;
 		if (romToBoot == romconf->current_rom) {
 			// tried them all and all are bad!
-			ets_printf("No good rom available.\r\n");
+			ets_printf("No good ROM available.\r\n");
 			return 0;
 		}
 		runAddr = check_image(romconf->roms[romToBoot]);
@@ -549,12 +517,11 @@ uint32 NOINLINE find_image(void) {
 	system_rtc_mem(RBOOT_RTC_ADDR, &rtc, sizeof(rboot_rtc_data), RBOOT_RTC_WRITE);
 #endif
 
-	ets_printf("Booting rom %d.\r\n", romToBoot);
+	ets_printf("Booting ROM %d.\r\n", romToBoot);
 	// copy the loader to top of iram
 	ets_memcpy((void*)_text_addr, _text_data, _text_len);
 	// return address to load from
 	return runAddr;
-
 }
 
 #ifdef BOOT_NO_ASM
