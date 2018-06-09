@@ -206,16 +206,6 @@ use the `-boot2` option. Note: the test loads included with rBoot are built with
 `irom0_0_seg` in the linker file is irrelevant to them) but 'normal' user apps
 always do.
 
-irom checksum
--------------
-The SDK boot loader checksum only covers sections loaded into ram (data and some
-code). Most of the SDK and user code remains on the flash and that is not
-included in the checksum. This means you could attempt to boot a corrupt rom
-and, because it looks ok to the boot loader, there will be no attempt to switch
-to a backup rom. rBoot improves on this by allowing the `.irom0.text` section to
-be included in the checksum. To enable this uncomment `#define BOOT_IROM_CHKSUM`
-in `rboot.h` and build your roms with esptool2 using the `-iromchksum` option.
-
 Big flash support
 -----------------
 This only needs to be enabled if you wish to be able to memory map more than the

@@ -27,10 +27,10 @@ usercode* NOINLINE load_rom(uint32 readpos) {
 
 	// create function pointer for entry point
 	usercode = header.entry;
-	
+
 	// copy all the sections
 	for (sectcount = header.count; sectcount > 0; sectcount--) {
-		
+
 		// read section header
 		SPIRead(readpos, &section, sizeof(section_header));
 		readpos += sizeof(section_header);

@@ -47,10 +47,6 @@ extern "C" {
 // BOOT_GPIO_ENABLED or BOOT_GPIO_SKIP_ENABLED is enabled
 //#define BOOT_GPIO_NUM 16
 
-// uncomment to include .irom0.text section in the checksum
-// roms must be built with esptool2 using -iromchksum option
-//#define BOOT_IROM_CHKSUM
-
 // uncomment to add a boot delay, allows you time to connect
 // a terminal before rBoot starts to run and output messages
 // value is in microseconds

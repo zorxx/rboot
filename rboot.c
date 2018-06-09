@@ -517,7 +517,7 @@ uint32 NOINLINE find_image(void) {
 	system_rtc_mem(RBOOT_RTC_ADDR, &rtc, sizeof(rboot_rtc_data), RBOOT_RTC_WRITE);
 #endif
 
-	ets_printf("Booting ROM %d.\r\n", romToBoot);
+	ets_printf("Booting ROM %d @ 0x%08x\r\n", romToBoot, romconf->roms[romToBoot]);
 	// copy the loader to top of iram
 	ets_memcpy((void*)_text_addr, _text_data, _text_len);
 	// return address to load from

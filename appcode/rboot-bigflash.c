@@ -57,7 +57,7 @@ void __attribute__((section(".iram.text"))) Cache_Read_Enable_New(void) {
 		rBoot_mmap_2 = val / 2;
 		rBoot_mmap_1 = val % 2;
 		
-		ets_printf("mmap %d,%d,1\r\n", rBoot_mmap_1, rBoot_mmap_2);
+		//ets_printf("mmap %d,%d,1\r\n", rBoot_mmap_1, rBoot_mmap_2);
 	}
 	
 	Cache_Read_Enable(rBoot_mmap_1, rBoot_mmap_2, 1);
