@@ -24,12 +24,12 @@ extern "C" {
  *	@see    rboot_write_flash
 */
 typedef struct {
-	uint32 start_addr;
-	uint32 start_sector;
+	uint32_t start_addr;
+	uint32_t start_sector;
 	//uint32 max_sector_count;
-	int32 last_sector_erased;
-	uint8 extra_count;
-	uint8 extra_bytes[4];
+	int32_t last_sector_erased;
+	uint8_t extra_count;
+	uint8_t extra_bytes[4];
 } rboot_write_status;
 
 /**	@brief	Read rBoot configuration from flash
@@ -37,7 +37,7 @@ typedef struct {
  *  @note   Returns rboot_config (defined in rboot.h) allowing you to modify any values
  *          in it, including the ROM layout.
 */
-rboot_config ICACHE_FLASH_ATTR rboot_get_config(void);
+rboot_config rboot_get_config(void);
 
 /**	@brief	Write rBoot configuration to flash memory
  *	@param	conf pointer to a rboot_config structure containing configuration to save
@@ -47,7 +47,7 @@ rboot_config ICACHE_FLASH_ATTR rboot_get_config(void);
  *          You can use the rest of this sector for your app settings, as long as you
  *          protect this structure when you do so.
 */
-bool ICACHE_FLASH_ATTR rboot_set_config(rboot_config *conf);
+bool rboot_set_config(rboot_config *conf);
 
 /** @brief  Get index of current ROM
  *  @retval uint8 Index of the current ROM
@@ -55,7 +55,7 @@ bool ICACHE_FLASH_ATTR rboot_set_config(rboot_config *conf);
  *          running ROM, as long as you haven't changed it since boot or rBoot
  *          booted the rom in temporary boot mode, see rboot_get_last_boot_rom).
 */
-uint8 ICACHE_FLASH_ATTR rboot_get_current_rom(void);
+uint8_t rboot_get_current_rom(void);
 
 /**	@brief	Set the index of current ROM
  *	@param	rom The index of the ROM to use on next boot
@@ -63,7 +63,7 @@ uint8 ICACHE_FLASH_ATTR rboot_get_current_rom(void);
  *  @note   Set the current boot ROM, which will be used when next restarted.
  *  @note   This function re-writes the whole configuration to flash memory (not just the current ROM index)
 */
-bool ICACHE_FLASH_ATTR rboot_set_current_rom(uint8 rom);
+bool rboot_set_current_rom(uint8_t rom);
 
 /**	@brief  Initialise flash write process
  *	@param  start_addr Address on the SPI flash to begin write to
@@ -72,7 +72,7 @@ bool ICACHE_FLASH_ATTR rboot_set_current_rom(uint8 rom);
  *          must be passed back on each write. The contents of the structure should not
  *          be modified by the calling code.
 */
-rboot_write_status ICACHE_FLASH_ATTR rboot_write_init(uint32 start_addr);
+rboot_write_status rboot_write_init(uint32_t start_addr);
 
 /** @brief  Complete flash write process
  *  @param  status Pointer to rboot_write_status structure defining the write status
@@ -81,7 +81,7 @@ rboot_write_status ICACHE_FLASH_ATTR rboot_write_init(uint32 start_addr);
  *          of 4 bytes there will be a few bytes unwritten, until you call
  *          this function).
 */
-bool ICACHE_FLASH_ATTR rboot_write_end(rboot_write_status *status);
+bool rboot_write_end(rboot_write_status *status);
 
 /**	@brief  Write data to flash memory
  *	@param  status Pointer to rboot_write_status structure defining the write status
@@ -93,7 +93,7 @@ bool ICACHE_FLASH_ATTR rboot_write_end(rboot_write_status *status);
  *  of OTA data is received over the network.
  *  @note   Call rboot_write_init before calling this function to get the rboot_write_status structure
 */
-bool ICACHE_FLASH_ATTR rboot_write_flash(rboot_write_status *status, uint8 *data, uint16 len);
+bool rboot_write_flash(rboot_write_status *status, uint8_t *data, uint16_t len);
 
 #ifdef BOOT_RTC_ENABLED
 /** @brief  Get rBoot status/control data from RTC data area
@@ -101,14 +101,14 @@ bool ICACHE_FLASH_ATTR rboot_write_flash(rboot_write_status *status, uint8 *data
  *  @retval bool True on success, false if no data/invalid checksum (in which
  *          case do not use the contents of the structure)
 */
-bool ICACHE_FLASH_ATTR rboot_get_rtc_data(rboot_rtc_data *rtc);
+bool rboot_get_rtc_data(rboot_rtc_data *rtc);
 
 /** @brief  Set rBoot status/control data in RTC data area
  *  @param  rtc pointer to a rboot_rtc_data structure
  *  @retval bool True on success
  *  @note   The checksum will be calculated automatically for you.
 */
-bool ICACHE_FLASH_ATTR rboot_set_rtc_data(rboot_rtc_data *rtc);
+bool rboot_set_rtc_data(rboot_rtc_data *rtc);
 
 /** @brief  Set temporary rom for next boot
  *  @param  rom Rom slot number for next boot
@@ -118,7 +118,7 @@ bool ICACHE_FLASH_ATTR rboot_set_rtc_data(rboot_rtc_data *rtc);
  *          the flash, so after another reset it will boot back to the original
  *          rom.
 */
-bool ICACHE_FLASH_ATTR rboot_set_temp_rom(uint8 rom);
+bool rboot_set_temp_rom(uint8_t rom);
 
 /** @brief  Get the last booted rom slot number
  *  @param  rom Pointer to rom slot number variable to populate
@@ -126,7 +126,7 @@ bool ICACHE_FLASH_ATTR rboot_set_temp_rom(uint8 rom);
  *  @note   This will find the currently running rom, even if booted as a
  *          temporary rom.
 */
-bool ICACHE_FLASH_ATTR rboot_get_last_boot_rom(uint8 *rom);
+bool rboot_get_last_boot_rom(uint8_t *rom);
 
 /** @brief  Get the last boot mode
  *  @param  mode Pointer to mode variable to populate
@@ -134,7 +134,7 @@ bool ICACHE_FLASH_ATTR rboot_get_last_boot_rom(uint8 *rom);
  *  @note   This will indicate the type of boot: MODE_STANDARD, MODE_GPIO_ROM or
  *          MODE_TEMP_ROM.
 */
-bool ICACHE_FLASH_ATTR rboot_get_last_boot_mode(uint8 *mode);
+bool rboot_get_last_boot_mode(uint8_t *mode);
 #endif
 
 #ifdef __cplusplus

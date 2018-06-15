@@ -23,31 +23,31 @@
 #define READ_SIZE 0x1000
 
 // esp8266 built in rom functions
-extern uint32 SPIRead(uint32 addr, void *outptr, uint32 len);
-extern uint32 SPIEraseSector(int);
-extern uint32 SPIWrite(uint32 addr, void *inptr, uint32 len);
+extern uint32_t SPIRead(uint32_t addr, void *outptr, uint32_t len);
+extern uint32_t SPIEraseSector(int);
+extern uint32_t SPIWrite(uint32_t addr, void *inptr, uint32_t len);
 extern void ets_printf(char*, ...);
 extern void ets_delay_us(int);
-extern void ets_memset(void*, uint8, uint32);
-extern void ets_memcpy(void*, const void*, uint32);
+extern void ets_memset(void*, uint8_t, uint32_t);
+extern void ets_memcpy(void*, const void*, uint32_t);
 
 // functions we'll call by address
-typedef void stage2a(uint32);
+typedef void stage2a(uint32_t);
 typedef void usercode(void);
 
 // standard rom header
 typedef struct {
 	// general rom header
-	uint8 magic;
-	uint8 count;
-	uint8 flags1;
-	uint8 flags2;
+	uint8_t magic;
+	uint8_t count;
+	uint8_t flags1;
+	uint8_t flags2;
 	usercode* entry;
 } rom_header;
 
 typedef struct {
-	uint8* address;
-	uint32 length;
+	uint8_t* address;
+	uint32_t length;
 } section_header;
 
 #define ZBOOT_MAGIC 0x279bfbf1
