@@ -16,7 +16,7 @@
 #define ROM_MAGIC_NEW1 0xea
 #define ROM_MAGIC_NEW2 0x04
 
-// buffer size, must be at least 0x10 (size of rom_header_new structure)
+// buffer size, must be at least 0x100 (size of zimage_header structure)
 #define BUFFER_SIZE 0x100
 
 // stage2 read chunk maximum size (limit for SPIRead)
@@ -50,25 +50,27 @@ typedef struct {
 	uint32 length;
 } section_header;
 
-// new rom header (irom section first) there is
-// another 8 byte header straight afterward the
-// standard header
-typedef struct {
-	// general rom header
-	uint8 magic;
-	uint8 count; // second magic for new header
-	uint8 flags1;
-	uint8 flags2;
-	uint32 entry;
-	// new type rom, lib header
-	uint32 add; // zero
-	uint32 len; // length of irom section
-} rom_header_new;
+#define ZBOOT_MAGIC 0x279bfbf1
+
+#define ZBOOT_HEADER_OFFSET_MAGIC 0
+#define ZBOOT_HEADER_OFFSET_COUNT 1
+#define ZBOOT_HEADER_OFFSET_ENTRY 2
+
+typedef struct
+{
+    uint32_t magic;
+    uint32_t count;
+    uint32_t entry;
+    uint32_t version;
+    uint32_t date;
+    uint32_t reserved[3];
+    char     description[88];
+} zimage_header;
 
 // RTC reset reason values
 enum rst_reason {
-	REASON_DEFAULT_RST		= 0,
-	REASON_WDT_RST			= 1,
+	REASON_DEFAULT_RST	= 0,
+	REASON_WDT_RST		= 1,
 	REASON_EXCEPTION_RST	= 2,
 	REASON_SOFT_WDT_RST   	= 3,
 	REASON_SOFT_RESTART 	= 4,

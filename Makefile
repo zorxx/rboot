@@ -1,9 +1,9 @@
 #
 # Makefile for rBoot
-# https://github.com/raburton/esp8266
+# https://github.com/zorxx/zboot
 #
 
-ESPTOOL2 ?= ../esptool2/esptool2
+ZTOOL ?= ../ztool/ztool
 
 RBOOT_BUILD_BASE ?= build
 RBOOT_FW_BASE    ?= firmware
@@ -23,10 +23,8 @@ Q := @
 endif
 
 CFLAGS    = -Os -O3 -Wpointer-arith -Wundef -Werror -Wl,-EL -fno-inline-functions -nostdlib -mlongcalls -mtext-section-literals  -D__ets__ -DICACHE_FLASH
-LDFLAGS   = -nostdlib -Wl,--no-check-sections -u call_user_start -Wl,-static
+LDFLAGS   = -nostdlib -Wl,--no-check-sections -u call_user_start -Wl,-static -Wl,-Map=$(RBOOT_BUILD_BASE)/rboot.map
 LD_SCRIPT = eagle.app.v6.ld
-
-E2_OPTS = -quiet -bin -boot0
 
 ifeq ($(RBOOT_BIG_FLASH),1)
 	CFLAGS += -DBOOT_BIG_FLASH
@@ -75,46 +73,16 @@ ifneq ($(RBOOT_EXTRA_INCDIR),)
 endif
 CFLAGS += $(addprefix -I,.)
 
-ifeq ($(SPI_SIZE), 256K)
-	E2_OPTS += -256
-else ifeq ($(SPI_SIZE), 512K)
-	E2_OPTS += -512
-else ifeq ($(SPI_SIZE), 1M)
-	E2_OPTS += -1024
-else ifeq ($(SPI_SIZE), 2M)
-	E2_OPTS += -2048
-else ifeq ($(SPI_SIZE), 4M)
-	E2_OPTS += -4096
-endif
-ifeq ($(SPI_MODE), qio)
-	E2_OPTS += -qio
-else ifeq ($(SPI_MODE), dio)
-	E2_OPTS += -dio
-else ifeq ($(SPI_MODE), qout)
-	E2_OPTS += -qout
-else ifeq ($(SPI_MODE), dout)
-	E2_OPTS += -dout
-endif
-ifeq ($(SPI_SPEED), 20)
-	E2_OPTS += -20
-else ifeq ($(SPI_SPEED), 26)
-	E2_OPTS += -26.7
-else ifeq ($(SPI_SPEED), 40)
-	E2_OPTS += -40
-else ifeq ($(SPI_SPEED), 80)
-	E2_OPTS += -80
-endif
-
 .SECONDARY:
 
 #all: $(RBOOT_BUILD_BASE) $(RBOOT_FW_BASE) $(RBOOT_FW_BASE)/rboot.bin $(RBOOT_FW_BASE)/testload1.bin $(RBOOT_FW_BASE)/testload2.bin
 all: $(RBOOT_BUILD_BASE) $(RBOOT_FW_BASE) $(RBOOT_FW_BASE)/rboot.bin
 
 $(RBOOT_BUILD_BASE):
-	mkdir -p $@
+	$(Q) mkdir -p $@
 
 $(RBOOT_FW_BASE):
-	mkdir -p $@
+	$(Q) mkdir -p $@
 
 $(RBOOT_BUILD_BASE)/rboot-stage2a.o: rboot-stage2a.c rboot-private.h rboot.h
 	@echo "CC $<"
@@ -125,8 +93,8 @@ $(RBOOT_BUILD_BASE)/rboot-stage2a.elf: $(RBOOT_BUILD_BASE)/rboot-stage2a.o
 	$(Q) $(LD) -Trboot-stage2a.ld $(LDFLAGS) -Wl,--start-group $^ -Wl,--end-group -o $@
 
 $(RBOOT_BUILD_BASE)/rboot-hex2a.h: $(RBOOT_BUILD_BASE)/rboot-stage2a.elf
-	@echo "E2 $@"
-	$(Q) $(ESPTOOL2) -quiet -header $< $@ .text
+	@echo "ZB $@"
+	$(Q) $(ZTOOL) -d0 -i -e $< -o $@ -s ".text"
 
 $(RBOOT_BUILD_BASE)/rboot.o: rboot.c rboot-private.h rboot.h $(RBOOT_BUILD_BASE)/rboot-hex2a.h
 	@echo "CC $<"
@@ -141,8 +109,8 @@ $(RBOOT_BUILD_BASE)/%.elf: $(RBOOT_BUILD_BASE)/%.o
 	$(Q) $(LD) -T$(LD_SCRIPT) $(LDFLAGS) -Wl,--start-group $^ -Wl,--end-group -o $@
 
 $(RBOOT_FW_BASE)/%.bin: $(RBOOT_BUILD_BASE)/%.elf
-	@echo "E2 $@"
-	$(Q) $(ESPTOOL2) $(E2_OPTS) $< $@ .text .rodata
+	@echo "ZB $@"
+	$(Q) $(ZTOOL) -d0 -b -c$(SPI_SIZE) -m$(SPI_MODE) -f$(SPI_SPEED) -e $< -o $@ -s".text .rodata"
 
 clean:
 	@echo "RM $(RBOOT_BUILD_BASE) $(RBOOT_FW_BASE)"

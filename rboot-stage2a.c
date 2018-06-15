@@ -16,20 +16,20 @@ usercode* NOINLINE load_rom(uint32 readpos) {
 	uint8 sectcount;
 	uint8 *writepos;
 	uint32 remaining;
-	usercode* usercode;
 	
-	rom_header header;
+	uint32_t header_count;	
+	uint32_t header_entry;	
 	section_header section;
 	
 	// read rom header
-	SPIRead(readpos, &header, sizeof(rom_header));
-	readpos += sizeof(rom_header);
-
-	// create function pointer for entry point
-	usercode = header.entry;
+	readpos += sizeof(uint32_t); // skip magic
+	SPIRead(readpos, &header_count, sizeof(header_count));
+	readpos += sizeof(uint32_t);
+	SPIRead(readpos, &header_entry, sizeof(header_entry));
+	readpos += 28 * sizeof(uint32_t); 
 
 	// copy all the sections
-	for (sectcount = header.count; sectcount > 0; sectcount--) {
+	for (sectcount = header_count; sectcount > 0; sectcount--) {
 
 		// read section header
 		SPIRead(readpos, &section, sizeof(section_header));
@@ -58,7 +58,7 @@ usercode* NOINLINE load_rom(uint32 readpos) {
 		}
 	}
 
-	return usercode;
+	return (usercode *) header_entry; 
 }
 
 #ifdef BOOT_NO_ASM

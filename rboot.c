@@ -13,82 +13,102 @@
 #define UART_CLK_FREQ	(26000000 * 2)
 #endif
 
-static uint32 check_image(uint32 readpos) {
+#define DEBUG(...)  ets_printf(__VA_ARGS__)
 
-	uint8 buffer[BUFFER_SIZE];
-	uint8 sectcount;
-	uint8 sectcurrent;
-	uint8 chksum = CHKSUM_INIT;
-	uint32 loop;
-	uint32 remaining;
-	uint32 romaddr;
+static uint32_t CheckImage(uint32_t readpos)
+{
+   uint8_t buffer[BUFFER_SIZE];
+   zimage_header *zheader = (zimage_header *) buffer;   
+   uint32_t start_pos = readpos;
+   uint32_t value;
+   uint32_t count;
+   uint32_t i;
+   uint32_t chksum = 0; 
 
-	rom_header_new *header = (rom_header_new*)buffer;
-	section_header *section = (section_header*)buffer;
+   if (readpos == 0 || readpos == 0xffffffff)
+   {
+      DEBUG("Invalid section start address (%08x)\n", start_pos);
+      return 0;
+   }
 
-	if (readpos == 0 || readpos == 0xffffffff) {
-		return 0;
-	}
+   if (SPIRead(readpos, zheader, sizeof(*zheader)) != 0)
+   {
+      DEBUG("Failed to read header (%u bytes)\n", sizeof(*zheader));
+      return 0;
+   }
+   readpos += sizeof(*zheader);
 
-	// read rom header
-	if (SPIRead(readpos, header, sizeof(rom_header_new)) != 0) {
-		return 0;
-	}
+   // Sanity-check header 
+   if(zheader->magic != ZBOOT_MAGIC)
+   {
+      DEBUG("Invalid header magic (%08x, expected %08x)\n", zheader->magic, ZBOOT_MAGIC);
+      return 0;
+   }
+   if(zheader->count > 256)
+   {
+      DEBUG("Invalid section count (%u)\n", zheader->count);
+      return 0;
+   }
+   if(zheader->entry < 0x40100000 || zheader->entry >= 0x40180000)
+   {
+      DEBUG("Invalid entrypoint (%08x)\n", zheader->entry);
+      return 0;
+   }
 
-	// check header type
-	if (header->magic == ROM_MAGIC
-	||  header->magic == ROM_MAGIC_NEW1
-        ||  header->magic == ROM_MAGIC_NEW2) {
-		// old type, no extra header or irom section to skip over
-		romaddr = readpos;
-		readpos += sizeof(rom_header);
-		sectcount = header->count;
-	} else {
-		return 0;
-	}
+   // Add image header to checksum
+   for (i = 0; i < sizeof(*zheader); i += sizeof(uint32_t))
+      chksum += *((uint32_t *) (buffer + i));
+   
+   // test each section
+   count = zheader->count;
+   for (i = 0; i < count; ++i)
+   {
+      section_header *sect = (section_header *) buffer;
+      uint32_t remaining;
 
-	// test each section
-	for (sectcurrent = 0; sectcurrent < sectcount; sectcurrent++) {
+      if (SPIRead(readpos, sect, sizeof(*sect)) != 0
+      || (sect->length % sizeof(uint32_t) != 0))
+      {
+         DEBUG("Section %u, invalid length (%08x)\n", i, sect->length);
+         return 0;
+      }
+      readpos += sizeof(*sect);
 
-		// read section header
-		if (SPIRead(readpos, section, sizeof(section_header)) != 0) {
-			return 0;
-		}
-		readpos += sizeof(section_header);
+      // Add section header to checksum
+      chksum += (uint32_t) sect->address;
+      chksum += sect->length;
 
-		// get section address and length
-		remaining = section->length;
+      remaining = sect->length;
+      while (remaining > 0) 
+      {
+         uint32_t readlen = (remaining > BUFFER_SIZE) ? BUFFER_SIZE : remaining;
+         uint32_t loop;
 
-		while (remaining > 0) {
-			// work out how much to read, up to BUFFER_SIZE
-			uint32 readlen = (remaining < BUFFER_SIZE) ? remaining : BUFFER_SIZE;
-			// read the block
-			if (SPIRead(readpos, buffer, readlen) != 0) {
-				return 0;
-			}
-			// increment next read position
-			readpos += readlen;
-			// decrement remaining count
-			remaining -= readlen;
-			// add to chksum
-			for (loop = 0; loop < readlen; loop++) {
-				chksum ^= buffer[loop];
-			}
-		}
-	}
+         if (SPIRead(readpos, buffer, readlen) != 0)
+         {
+            DEBUG("Failed to read section %u data at offset (%08x)\n", i, remaining);
+            return 0;
+         }
+         readpos += readlen;
+         remaining -= readlen;
+         for (loop = 0; loop < readlen; loop += sizeof(uint32_t))
+            chksum += *((uint32_t *) (buffer + loop));
+      }
+   }
 
-	// round up to next 16 and get checksum
-	readpos = readpos | 0x0f;
-	if (SPIRead(readpos, buffer, 1) != 0) {
-		return 0;
-	}
+   if (SPIRead(readpos, &value, sizeof(value)) != 0)
+   {
+      DEBUG("Failed to read checksum from flash\n"); 
+      return 0;
+   }
 
-	// compare calculated and stored checksums
-	if (buffer[0] != chksum) {
-		return 0;
-	}
+   if(value != chksum)
+   {
+      DEBUG("Checksum mismatch (calculated %08x, expected %08x))\n", chksum, value); 
+      return 0;
+   }
 
-	return romaddr;
+   return start_pos; 
 }
 
 #if defined (BOOT_GPIO_ENABLED) || defined(BOOT_GPIO_SKIP_ENABLED)
@@ -455,7 +475,8 @@ uint32 NOINLINE find_image(void) {
 	}
 
 	// check rom is valid
-	runAddr = check_image(romconf->roms[romToBoot]);
+        DEBUG("Checking image %u @ %08x\n", romToBoot, romconf->roms[romToBoot]);
+	runAddr = CheckImage(romconf->roms[romToBoot]);
 
 #ifdef BOOT_GPIO_ENABLED
 	if (gpio_boot && runAddr == 0) {
@@ -489,7 +510,7 @@ uint32 NOINLINE find_image(void) {
 			ets_printf("No good ROM available.\r\n");
 			return 0;
 		}
-		runAddr = check_image(romconf->roms[romToBoot]);
+		runAddr = CheckImage(romconf->roms[romToBoot]);
 	}
 
 	// re-write config, if required
