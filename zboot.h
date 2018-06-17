@@ -1,0 +1,93 @@
+/* \brief zboot - bootloader for ESP8266 
+ * Copyright 2018 Zorxx Software, zorxx@zorxx.com
+ * Copyright 2015 Richard A Burton, richardaburton@gmail.com
+ * See license.txt for license terms.
+ * Based on rBoot from Richard A. Burton
+ */
+#ifndef ZBOOT_H
+#define ZBOOT_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include <stdint.h>
+
+#define ZBOOT_VERSION_MAJOR        1
+#define ZBOOT_VERSION_MINOR        0
+#define ZBOOT_VERSION_INCREMENTAL  0
+
+// uncomment to use only c code
+// if you aren't using gcc you may need to do this
+//#define BOOT_NO_ASM
+
+// uncomment to enable GPIO booting of specific rom
+// (specified in rBoot config block)
+// cannot be used at same time as BOOT_GPIO_SKIP_ENABLED
+//#define BOOT_GPIO_ENABLED
+
+// uncomment to enable GPIO rom skip mode, trigger
+// GPIO at boot time to skip to next rom
+// cannot be used at same time as BOOT_GPIO_ENABLED
+//#define BOOT_GPIO_SKIP_ENABLED
+
+// set the GPIO pin used by GPIO modes above (will default
+// to 16 if not manually set), only applicable when
+// BOOT_GPIO_ENABLED or BOOT_GPIO_SKIP_ENABLED is enabled
+//#define BOOT_GPIO_NUM 16
+
+// uncomment to add a boot delay, allows you time to connect
+// a terminal before rBoot starts to run and output messages
+// value is in microseconds
+//#define BOOT_DELAY_MICROS 2000000
+
+#define BOOT_CONFIG_SECTOR 2
+
+// defaults for unset user options
+#ifndef BOOT_GPIO_NUM
+#define BOOT_GPIO_NUM 16
+#endif
+
+#ifndef MAX_ROMS
+#define MAX_ROMS 4
+#endif
+
+#pragma pack(push,1)
+typedef struct {
+   uint32_t magic;          ///< Our magic, identifies zboot configuration - should be ZBOOT_CONFIG_MAGIC
+      #define ZBOOT_CONFIG_MAGIC 0xdcce4b28 
+   uint8_t mode;            ///< Boot loader mode (MODE_STANDARD | MODE_GPIO_ROM | MODE_GPIO_SKIP)
+      #define MODE_STANDARD    0x00
+      #define MODE_GPIO_ROM    0x01
+      #define MODE_TEMP_ROM    0x02
+      #define MODE_GPIO_ERASES_SDKCONFIG 0x04
+      #define MODE_GPIO_SKIP   0x08
+   uint8_t current_rom;     ///< Currently selected ROM (will be used for next standard boot)
+   uint8_t gpio_rom;        ///< ROM to use for GPIO boot (hardware switch) with mode set to MODE_GPIO_ROM
+   uint8_t count;           ///< Quantity of ROMs available to boot
+   uint32_t roms[MAX_ROMS]; ///< Flash addresses of each ROM
+   uint8_t reserved[3];
+   uint8_t chksum;          ///< Checksum of this configuration structure
+} zboot_config;
+#pragma pack(pop)
+
+#define ZBOOT_RTC_ADDR 64  // Start of RTC "user" area
+
+#pragma pack(push,1)
+typedef struct {
+   uint32_t magic;
+      #define ZBOOT_RTC_MAGIC 0x2334ae68
+   uint8_t next_mode;        ///< The next boot mode, defaults to MODE_STANDARD - can be set to MODE_TEMP_ROM
+   uint8_t last_mode;        ///< The last (this) boot mode - can be MODE_STANDARD, MODE_GPIO_ROM or MODE_TEMP_ROM
+   uint8_t last_rom;         ///< The last (this) boot rom number
+   uint8_t temp_rom;         ///< The next boot rom number when next_mode set to MODE_TEMP_ROM
+   uint8_t reserved[3];
+   uint8_t chksum;           ///< Checksum of this structure this will be updated for you passed to the API
+} zboot_rtc_data;
+#pragma pack(pop)
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif

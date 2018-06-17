@@ -1,18 +1,17 @@
-#ifndef __RBOOT_PRIVATE_H__
-#define __RBOOT_PRIVATE_H__
+/* \brief zboot - bootloader for ESP8266 
+ * Copyright 2018 Zorxx Software, zorxx@zorxx.com
+ * Copyright 2015 Richard A Burton, richardaburton@gmail.com
+ * See license.txt for license terms.
+ * Based on rBoot from Richard A. Burton
+ */
+#ifndef ZBOOT_PRIVATE_H
+#define ZBOOT_PRIVATE_H
 
-//////////////////////////////////////////////////
-// rBoot open source boot loader for ESP8266.
-// Copyright 2015 Richard A Burton
-// richardaburton@gmail.com
-// See license.txt for license terms.
-//////////////////////////////////////////////////
-
-#include <rboot.h>
+#include "zboot.h"
 
 #define NOINLINE __attribute__ ((noinline))
 
-#define ROM_MAGIC	   0xe9
+#define ROM_MAGIC      0xe9
 #define ROM_MAGIC_NEW1 0xea
 #define ROM_MAGIC_NEW2 0x04
 
@@ -22,7 +21,7 @@
 // stage2 read chunk maximum size (limit for SPIRead)
 #define READ_SIZE 0x1000
 
-// esp8266 built in rom functions
+// esp8266 built in ROM functions
 extern uint32_t SPIRead(uint32_t addr, void *outptr, uint32_t len);
 extern uint32_t SPIEraseSector(int);
 extern uint32_t SPIWrite(uint32_t addr, void *inptr, uint32_t len);
@@ -35,26 +34,19 @@ extern void ets_memcpy(void*, const void*, uint32_t);
 typedef void stage2a(uint32_t);
 typedef void usercode(void);
 
-// standard rom header
-typedef struct {
-	// general rom header
-	uint8_t magic;
-	uint8_t count;
-	uint8_t flags1;
-	uint8_t flags2;
-	usercode* entry;
-} rom_header;
-
-typedef struct {
-	uint8_t* address;
-	uint32_t length;
+typedef struct
+{ 
+   uint32_t address;
+   uint32_t length;
 } section_header;
 
 #define ZBOOT_MAGIC 0x279bfbf1
 
-#define ZBOOT_HEADER_OFFSET_MAGIC 0
-#define ZBOOT_HEADER_OFFSET_COUNT 1
-#define ZBOOT_HEADER_OFFSET_ENTRY 2
+#define ZBOOT_HEADER_OFFSET_MAGIC   0
+#define ZBOOT_HEADER_OFFSET_COUNT   1
+#define ZBOOT_HEADER_OFFSET_ENTRY   2
+#define ZBOOT_HEADER_OFFSET_VERSION 3
+#define ZBOOT_HEADER_OFFSET_DATE    4
 
 typedef struct
 {
@@ -67,15 +59,4 @@ typedef struct
     char     description[88];
 } zimage_header;
 
-// RTC reset reason values
-enum rst_reason {
-	REASON_DEFAULT_RST	= 0,
-	REASON_WDT_RST		= 1,
-	REASON_EXCEPTION_RST	= 2,
-	REASON_SOFT_WDT_RST   	= 3,
-	REASON_SOFT_RESTART 	= 4,
-	REASON_DEEP_SLEEP_AWAKE	= 5,
-	REASON_EXT_SYS_RST      = 6
-};
-
-#endif
+#endif /* ZBOOT_PRIVATE_H */
