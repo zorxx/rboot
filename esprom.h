@@ -10,6 +10,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define SECTOR_SIZE 0x1000 // flash sector size
+
 // Standard ESP8266 ROM header
 typedef struct
 {
@@ -20,7 +22,18 @@ typedef struct
    uint32_t entry;
 } rom_header;
 
-#define SECTOR_SIZE 0x1000
+#define ESP_CHKSUM_INIT 0xef
+static uint8_t esp_checksum8(uint8_t *start, uint8_t length)
+{
+   uint8_t chksum = ESP_CHKSUM_INIT;
+   while(length > 0)
+   {
+      chksum ^= *start;
+      ++start;
+      --length;
+   }
+   return chksum;
+}
 
 bool esprom_get_flash_size(uint32_t *size);
 

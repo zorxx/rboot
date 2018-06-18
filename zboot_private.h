@@ -40,23 +40,4 @@ typedef struct
    uint32_t length;
 } section_header;
 
-#define ZBOOT_MAGIC 0x279bfbf1
-
-#define ZBOOT_HEADER_OFFSET_MAGIC   0
-#define ZBOOT_HEADER_OFFSET_COUNT   1
-#define ZBOOT_HEADER_OFFSET_ENTRY   2
-#define ZBOOT_HEADER_OFFSET_VERSION 3
-#define ZBOOT_HEADER_OFFSET_DATE    4
-
-typedef struct
-{
-    uint32_t magic;
-    uint32_t count;
-    uint32_t entry;
-    uint32_t version;
-    uint32_t date;
-    uint32_t reserved[3];
-    char     description[88];
-} zimage_header;
-
 #endif /* ZBOOT_PRIVATE_H */

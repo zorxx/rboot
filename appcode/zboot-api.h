@@ -16,6 +16,12 @@ extern "C" {
 
 bool zboot_get_coldboot_index(uint8_t *index);
 bool zboot_set_coldboot_index(uint8_t index);
+bool zboot_set_temp_index(uint8_t index);
+bool zboot_set_gpio_number(uint8_t index);
+bool zboot_get_current_boot_index(uint8_t *index);
+bool zboot_get_current_boot_mode(uint8_t *mode);
+bool zboot_get_current_image_info(uint32_t *version, uint32_t *date,
+   char *description, uint8_t maxDescriptionLength);
 
 void *zboot_write_init(uint32_t start_addr);
 bool zboot_write_end(void *context);

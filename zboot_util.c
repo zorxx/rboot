@@ -4,22 +4,8 @@
  * See license.txt for license terms.
  * Based on rBoot from Richard A. Burton
  */
+#include "esprom.h"
 #include "zboot_util.h"
-
-#define CHKSUM_INIT 0xef
-
-uint8_t zboot_checksum8(uint8_t *start, uint8_t length)
-{
-   uint8_t chksum = CHKSUM_INIT;
-   while(length > 0)
-   {
-      chksum ^= *start;
-      ++start;
-      --length;
-   }
-   return chksum;
-}
-
 
 #ifndef BOOT_DEFAULT_CONFIG_IMAGE_COUNT
 #define BOOT_DEFAULT_CONFIG_IMAGE_COUNT 2
@@ -57,6 +43,6 @@ void default_config(zboot_config *config, uint32_t flashsize)
    config->mode = MODE_GPIO_SKIP;
 #endif
 
-   config->chksum = zboot_checksum8((uint8_t*)config, sizeof(*config)-sizeof(uint8_t)); 
+   config->chksum = esp_checksum8((uint8_t*)config, sizeof(*config)-sizeof(uint8_t)); 
 }
 

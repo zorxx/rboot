@@ -52,24 +52,32 @@ extern "C" {
 #define MAX_ROMS 4
 #endif
 
+// --------------------------------------------------------------------------------------------
+
 #pragma pack(push,1)
 typedef struct {
-   uint32_t magic;          ///< Our magic, identifies zboot configuration - should be ZBOOT_CONFIG_MAGIC
+   uint32_t magic;
       #define ZBOOT_CONFIG_MAGIC 0xdcce4b28 
-   uint8_t mode;            ///< Boot loader mode (MODE_STANDARD | MODE_GPIO_ROM | MODE_GPIO_SKIP)
+   uint8_t mode;
       #define MODE_STANDARD    0x00
       #define MODE_GPIO_ROM    0x01
       #define MODE_TEMP_ROM    0x02
-      #define MODE_GPIO_ERASES_SDKCONFIG 0x04
-      #define MODE_GPIO_SKIP   0x08
+      #define MODE_GPIO_SKIP   0x03
+      #define MODE_FAILSAFE    0x04
    uint8_t current_rom;     ///< Currently selected ROM (will be used for next standard boot)
    uint8_t gpio_rom;        ///< ROM to use for GPIO boot (hardware switch) with mode set to MODE_GPIO_ROM
    uint8_t count;           ///< Quantity of ROMs available to boot
    uint32_t roms[MAX_ROMS]; ///< Flash addresses of each ROM
-   uint8_t reserved[3];
+   uint8_t failsafe_rom;
+   uint8_t options; 
+      #define OPTION_GPIO_ERASES_SDKCONFIG 0x01
+      #define OPTION_UPDATE_BOOT_INDEX     0x02
+   uint8_t gpio_num;
    uint8_t chksum;          ///< Checksum of this configuration structure
 } zboot_config;
 #pragma pack(pop)
+
+// --------------------------------------------------------------------------------------------
 
 #define ZBOOT_RTC_ADDR 64  // Start of RTC "user" area
 
@@ -80,11 +88,32 @@ typedef struct {
    uint8_t next_mode;        ///< The next boot mode, defaults to MODE_STANDARD - can be set to MODE_TEMP_ROM
    uint8_t last_mode;        ///< The last (this) boot mode - can be MODE_STANDARD, MODE_GPIO_ROM or MODE_TEMP_ROM
    uint8_t last_rom;         ///< The last (this) boot rom number
-   uint8_t temp_rom;         ///< The next boot rom number when next_mode set to MODE_TEMP_ROM
+   uint8_t next_rom;         ///< The next boot rom number when next_mode set to MODE_TEMP_ROM
+   uint32_t rom_addr;
    uint8_t reserved[3];
-   uint8_t chksum;           ///< Checksum of this structure this will be updated for you passed to the API
+   uint8_t chksum;
 } zboot_rtc_data;
 #pragma pack(pop)
+
+// --------------------------------------------------------------------------------------------
+
+#define ZIMAGE_HEADER_OFFSET_MAGIC   0
+#define ZIMAGE_HEADER_OFFSET_COUNT   1
+#define ZIMAGE_HEADER_OFFSET_ENTRY   2
+#define ZIMAGE_HEADER_OFFSET_VERSION 3
+#define ZIMAGE_HEADER_OFFSET_DATE    4
+
+typedef struct
+{
+   uint32_t magic;
+      #define ZIMAGE_MAGIC 0x279bfbf1
+   uint32_t count;
+   uint32_t entry;
+   uint32_t version;
+   uint32_t date;
+   uint32_t reserved[3];
+   char     description[88];
+} zimage_header;
 
 #ifdef __cplusplus
 }

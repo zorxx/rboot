@@ -51,9 +51,9 @@ static uint32_t check_image(uint32_t readpos)
    readpos += sizeof(*zheader);
 
    // Sanity-check header 
-   if(zheader->magic != ZBOOT_MAGIC)
+   if(zheader->magic != ZIMAGE_MAGIC)
    {
-      DEBUG("Invalid header magic (%08x, expected %08x)\n", zheader->magic, ZBOOT_MAGIC);
+      DEBUG("Invalid header magic (%08x, expected %08x)\n", zheader->magic, ZIMAGE_MAGIC);
       return 0;
    }
    if(zheader->count > 256)
@@ -131,21 +131,18 @@ uint32_t NOINLINE find_image(void)
 {
    uint32_t runAddr;
    uint32_t flashsize;
-   int32_t romToBoot;
+   uint8_t bootIndex;
+   uint8_t bootMode;
    bool updateConfig = false;
    uint8_t buffer[SECTOR_SIZE];
    zboot_config *config = (zboot_config*)buffer;
-#ifdef BOOT_GPIO_ENABLED
-   bool gpio_boot = false;
-#endif
    zboot_rtc_data rtc;
-   uint8_t temp_boot = false;
    int i;
 
 #ifdef BOOT_BAUDRATE
    // soft reset doesn't reset PLL/divider, so leave as configured
    if (get_reset_reason() != REASON_SOFT_RESTART)
-      uart_div_modify( 0, UART_CLK_FREQ / BOOT_BAUDRATE);
+      uart_div_modify(0, UART_CLK_FREQ / BOOT_BAUDRATE);
 #endif
 
 #if defined BOOT_DELAY_MICROS && BOOT_DELAY_MICROS > 0
@@ -157,7 +154,7 @@ uint32_t NOINLINE find_image(void)
       ZBOOT_VERSION_INCREMENTAL);
    esprom_get_flash_size(&flashsize);
 
-   // Validate the zboot config
+   // Read the zboot config from flash 
    SPIRead(BOOT_CONFIG_SECTOR * SECTOR_SIZE, buffer, SECTOR_SIZE);
    if(config->magic != ZBOOT_CONFIG_MAGIC)
    {
@@ -183,9 +180,11 @@ uint32_t NOINLINE find_image(void)
    }
    updateConfig = false;
 
-   // First ROM to try is the index stored in the zboot_config, unless a temporary
-   //   ROM was selected in the non-volatie RTC memory
-   romToBoot = config->current_rom;
+   bootIndex = config->current_rom;
+   bootMode = MODE_STANDARD;
+
+   // Read RTC memory to determine if we've done a warm reset and
+   //  a temporary ROM was selected
    if (!rtc_copy_mem(ZBOOT_RTC_ADDR, &rtc, sizeof(rtc), false))
    {
       ets_printf("Failed to read RTC memory\n");
@@ -196,106 +195,106 @@ uint32_t NOINLINE find_image(void)
    }
    else
    {
-      if (rtc.next_mode & MODE_TEMP_ROM)
+      if (rtc.next_mode == MODE_TEMP_ROM)
       {
-         if (rtc.temp_rom >= config->count)
+         if (rtc.next_rom >= config->count)
          {
-            ets_printf("Invalid temp ROM selected (%u, %u max)\n", rtc.temp_rom, config->count);
+            ets_printf("Invalid temp ROM selected (%u, %u max)\n", rtc.next_rom, config->count);
          }
          else
          {
-            ets_printf("Booting temporary ROM index %u\n", rtc.temp_rom);
-            temp_boot = true;
-            romToBoot = rtc.temp_rom;
+            ets_printf("Booting temporary ROM index %u\n", rtc.next_rom);
+            bootMode = MODE_TEMP_ROM; 
+            bootIndex = rtc.next_rom;
          }
       }
    }
 
-#if defined(BOOT_GPIO_ENABLED) || defined (BOOT_GPIO_SKIP_ENABLED)
-   if(config->mode & MODE_GPIO_ROM != 0 && gpio_asserted(BOOT_GPIO_NUM))
+   if(bootMode == MODE_STANDARD)
    {
-#if defined(BOOT_GPIO_ENABLED)
-      if (config->gpio_rom >= config->count)
+      switch(config->mode)
       {
-         ets_printf("Invalid GPIO ROM selected.\r\n");
-         return 0;
-      }
-      ets_printf("Booting GPIO-selected ROM.\r\n");
-      romToBoot = config->gpio_rom;
-      gpio_boot = true;
-#elif defined(BOOT_GPIO_SKIP_ENABLED)
-      romToBoot = config->current_rom + 1;
-      if (romToBoot >= config->count)
-          romToBoot = 0;
-      config->current_rom = romToBoot;
-#endif
-      updateConfig = true;
-      if (config->mode & MODE_GPIO_ERASES_SDKCONFIG)
-      {
-         uint8_t sec;
-         ets_printf("Erasing SDK config sectors before booting.\r\n");
-         for (sec = 1; sec < 5; sec++)
-         {
-            SPIEraseSector((flashsize / SECTOR_SIZE) - sec);
-         }
+         case MODE_GPIO_ROM:
+            if(gpio_asserted(config->gpio_num))
+            {
+               if(config->gpio_rom < config->count)
+               {
+                  ets_printf("Invalid GPIO ROM selected.\r\n");
+               }
+               else
+               {
+                  bootIndex = config->gpio_rom;
+                  ets_printf("Booting GPIO-selected ROM index %u\n", bootIndex);
+                  bootMode = MODE_GPIO_ROM;
+               }
+            }
+            break;
+
+         case MODE_GPIO_SKIP:
+            if(gpio_asserted(config->gpio_num))
+            {
+               bootIndex = config->current_rom + 1;
+               if(bootIndex >= config->count)
+                  bootIndex = 0;
+               ets_printf("Booting GPIO-skip ROM index %u\n", bootIndex);
+               bootMode = MODE_GPIO_SKIP;
+            }
+            break;
+         default:
+            ets_printf("Unsupported mode %u\n", config->mode);
+            break;
       }
    }
-#endif
 
    if (config->current_rom >= config->count)
    {
-      // if invalid rom selected try rom 0
       ets_printf("Invalid ROM selected, defaulting to 0.\n");
-      romToBoot = 0;
-      config->current_rom = 0;
-      updateConfig = true;
+      bootIndex = 0;
    }
 
-   // check rom is valid
-   DEBUG("Checking image %u @ %08x\n", romToBoot, config->roms[romToBoot]);
-   runAddr = check_image(config->roms[romToBoot]);
+   // Loop through all ROMs, strting with the selected one
+   for(runAddr = 0, i = 0; runAddr == 0 && i < config->count; ++i)
+   {
+      uint8_t tryIndex = bootIndex + i;
+      uint32_t tryAddress; 
 
-#ifdef BOOT_GPIO_ENABLED
-   if (gpio_boot && runAddr == 0)
-   {
-      // don't switch to backup for gpio-selected rom
-      ets_printf("GPIO boot ROM (%d) is bad.\r\n", romToBoot);
-      return 0;
-   }
-#endif
-   if (temp_boot && runAddr == 0)
-   {
-      ets_printf("Temp boot ROM (%d) is bad.\r\n", romToBoot);
-      rtc.next_mode = MODE_STANDARD; // make sure rtc temp boot mode doesn't persist
-      rtc.chksum = zboot_rtc_checksum(&rtc);
-      rtc_copy_mem(ZBOOT_RTC_ADDR, &rtc, sizeof(rtc), true);
-      return 0;
-   }
+      if(tryIndex >= config->count)
+         tryIndex = 0;
+      tryAddress = config->roms[tryIndex];
+      DEBUG("Checking image %u @ %08x\n", tryIndex, tryAddress); 
 
-   // check we have a good rom
-   while (runAddr == 0)
-   {
-      ets_printf("ROM %d (0x%08x) is bad.\r\n", romToBoot, config->roms[romToBoot]);
-      // for normal mode try each previous rom
-      // until we find a good one or run out
-      updateConfig = true;
-      romToBoot--;
-      if (romToBoot < 0)
-         romToBoot = config->count - 1;
-      if (romToBoot == config->current_rom)
+      runAddr = check_image(tryAddress);
+      if(0 == runAddr)
       {
-         // tried them all and all are bad!
-         ets_printf("No good ROM available.\r\n");
-         return 0;
+         ets_printf("ROM %u is bad.\r\n", tryIndex); 
       }
-      runAddr = check_image(config->roms[romToBoot]);
+      else
+         bootIndex = tryIndex;
+   }
+
+   if(0 == runAddr)
+   {
+      ets_printf("No good ROM available.\r\n");
+      return 0;
+   }
+
+   if(config->options & OPTION_GPIO_ERASES_SDKCONFIG)
+   {
+      uint8_t sec;
+      ets_printf("Erasing SDK config sectors before booting.\r\n");
+      for (sec = 1; sec < 5; sec++)
+      {
+         SPIEraseSector((flashsize / SECTOR_SIZE) - sec);
+      }
    }
 
    // re-write config, if required
-   if (updateConfig)
+   if((config->options & OPTION_UPDATE_BOOT_INDEX) &&
+      (config->mode != MODE_TEMP_ROM) &&
+      (bootIndex != config->current_rom))
    {
-      ets_printf("Updating zboot config with ROM index %u\n", romToBoot);
-      config->current_rom = romToBoot;
+      ets_printf("Updating zboot config with ROM index %u\n", bootIndex);
+      config->current_rom = bootIndex;
       config->chksum = zboot_config_checksum(config);
       SPIEraseSector(BOOT_CONFIG_SECTOR);
       SPIWrite(BOOT_CONFIG_SECTOR * SECTOR_SIZE, buffer, SECTOR_SIZE);
@@ -304,21 +303,15 @@ uint32_t NOINLINE find_image(void)
    // set rtc boot data for app to read
    rtc.magic = ZBOOT_RTC_MAGIC;
    rtc.next_mode = MODE_STANDARD;
-   rtc.last_mode = MODE_STANDARD;
-   if (temp_boot)
-      rtc.last_mode |= MODE_TEMP_ROM;
-#ifdef BOOT_GPIO_ENABLED
-   if (gpio_boot)
-      rtc.last_mode |= MODE_GPIO_ROM;
-#endif
-   rtc.last_rom = romToBoot;
-   rtc.temp_rom = 0;
+   rtc.last_mode = bootMode; 
+   rtc.last_rom = bootIndex; 
+   rtc.rom_addr = config->roms[bootIndex];
+   rtc.next_rom = 0;
    rtc.chksum = zboot_rtc_checksum(&rtc);
    rtc_copy_mem(ZBOOT_RTC_ADDR, &rtc, sizeof(zboot_rtc_data), true);
 
-   ets_printf("Booting ROM %d @ 0x%08x\r\n", romToBoot, config->roms[romToBoot]);
-   // copy the loader to top of iram
-   ets_memcpy((void*)_text_addr, _text_data, _text_len);
+   ets_printf("Booting ROM %d @ 0x%08x\r\n", bootIndex, config->roms[bootIndex]);
+   ets_memcpy((void*)_text_addr, _text_data, _text_len); // Copy second stage loader top of IRAM 
    return runAddr; // return address to load from
 }
 

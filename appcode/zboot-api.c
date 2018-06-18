@@ -24,6 +24,7 @@ extern void Cache_Read_Enable(uint32_t, uint32_t, uint32_t);
 /* ----------------------------------------------------------------------------------------
  * Espressif SDK definitions.
  */
+
 typedef enum {
     SPI_FLASH_RESULT_OK,
     SPI_FLASH_RESULT_ERR,
@@ -41,21 +42,8 @@ bool system_rtc_mem_write(uint8_t des_addr, const void *src_addr, uint16_t save_
 #define os_free(s)   vPortFree(s)
 #define os_malloc(s) pvPortMalloc(s)
 
-typedef struct
-{ 
-   bool active;
-   uint32_t start_addr;
-   uint32_t start_sector;
-   int32_t last_sector;
-   int32_t last_sector_erased;
-   uint8_t extra_count;
-   uint8_t extra_bytes[4];
-} zboot_write_status;
-static zboot_write_status g_zboot_write_status = {0};
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+/* ----------------------------------------------------------------------------------------
+ */
 
 static bool zboot_get_config(zboot_config *config)
 {
@@ -70,7 +58,7 @@ static bool zboot_get_config(zboot_config *config)
    }
 
    // Validate checksum
-   checksum = zboot_checksum8((uint8_t *) config, sizeof(*config));
+   checksum = esp_checksum8((uint8_t *) config, sizeof(*config));
    if(checksum != config->chksum)
    {
       DEBUG("zboot: Checksum mismatch on zboot config (calculated %08x, expected %08x)\n",
@@ -107,7 +95,7 @@ static bool zboot_set_config(zboot_config *config)
    }
    else
    {
-      config->chksum = zboot_checksum8((uint8_t*)config, sizeof(*config) - sizeof(uint8_t)); 
+      config->chksum = esp_checksum8((uint8_t*)config, sizeof(*config) - sizeof(uint8_t)); 
       memcpy(buffer, config, sizeof(*config));  // Always at the start of the sector
 
       if(spi_flash_write(BOOT_CONFIG_SECTOR * SECTOR_SIZE,
@@ -131,14 +119,22 @@ static bool zboot_get_rtc_data(zboot_rtc_data *rtc)
       DEBUG("zboot: Failed to read RTC memory\n");
       return false;
    }
-   checksum = zboot_checksum8((uint8_t*)rtc, (sizeof(*rtc)-sizeof(uint8_t)));
+   checksum = esp_checksum8((uint8_t*)rtc, (sizeof(*rtc)-sizeof(uint8_t)));
    return (rtc->chksum == checksum); 
 }
 
 static bool zboot_set_rtc_data(zboot_rtc_data *rtc)
 {
-   rtc->chksum = zboot_checksum8((uint8_t*)rtc, (sizeof(*rtc)-sizeof(uint8_t)));
+   rtc->chksum = esp_checksum8((uint8_t*)rtc, (sizeof(*rtc)-sizeof(uint8_t)));
    return system_rtc_mem_write(ZBOOT_RTC_ADDR, rtc, sizeof(*rtc));
+}
+
+static bool zboot_get_image_header(uint32_t offset, zimage_header *header)
+{
+   if(spi_flash_read(offset, (uint32_t*)header, sizeof(*header)) != SPI_FLASH_RESULT_OK)
+      return false;
+   else
+      return true;
 }
 
 // ----------------------------------------------------------------------------------
@@ -165,6 +161,15 @@ bool zboot_set_coldboot_index(uint8_t index)
    return zboot_set_config(&config);
 }
 
+bool zboot_set_gpio_number(uint8_t index)
+{
+   zboot_config config;
+   if(!zboot_get_config(&config))
+      return false;
+   config.gpio_num = index;
+   return zboot_set_config(&config);
+}
+
 bool zboot_set_temp_index(uint8_t index)
 {
    zboot_rtc_data rtc;
@@ -176,7 +181,7 @@ bool zboot_set_temp_index(uint8_t index)
       rtc.last_rom = 0;
    }
    rtc.next_mode = MODE_TEMP_ROM;
-   rtc.temp_rom = index;
+   rtc.next_rom = index;
    return zboot_set_rtc_data(&rtc);
 }
 
@@ -207,11 +212,30 @@ bool zboot_get_current_boot_mode(uint8_t *mode)
    return true;
 }
 
-bool zboot_get_current_image_info(uint32_t *version)
+bool zboot_get_current_image_info(uint32_t *version, uint32_t *date,
+   char *description, uint8_t maxDescriptionLength)
 {
-   uint8_t index;
-   if(!zboot_get_current_boot_index(&index))
+   zboot_config config;
+   zimage_header header;
+   uint8_t bootIndex;
+   uint32_t imageAddress;
+
+   if(!zboot_get_current_boot_index(&bootIndex)
+   || !zboot_get_config(&config))
       return false;
+
+   if(bootIndex >= config.count)
+      return false;
+   imageAddress = config.roms[bootIndex];
+   if(!zboot_get_image_header(imageAddress, &header))
+      return false;
+
+   if(NULL != version)
+      *version = header.version;
+   if(NULL != date)
+      *date = header.date;
+   if(NULL != description && maxDescriptionLength > 0)
+      strncpy(description, header.description, maxDescriptionLength);
 
    return true;
 }
@@ -219,12 +243,24 @@ bool zboot_get_current_image_info(uint32_t *version)
 // ----------------------------------------------------------------------------------
 // Write application image
 
+typedef struct
+{ 
+   bool active;
+   uint32_t start_addr;
+   uint32_t start_sector;
+   int32_t last_sector;
+   int32_t last_sector_erased;
+   uint8_t extra_count;
+   uint8_t extra_bytes[4];
+} zboot_write_status;
+static zboot_write_status g_zboot_write_status = {0};
+
 // Note: there can be only one write operation in progress at a time
 void *zboot_write_init(uint32_t start_addr)
 {
    zboot_write_status *status = &g_zboot_write_status;
 
-   if(status)
+   if(status->active)
    {
       DEBUG("zboot: Write operation already in progress\n");
       return NULL;
@@ -366,7 +402,3 @@ void __attribute__((section(".iram.text"))) Cache_Read_Enable_New(void)
 	
    Cache_Read_Enable(rBoot_mmap_1, rBoot_mmap_2, 1);
 }
-
-#ifdef __cplusplus
-}
-#endif
