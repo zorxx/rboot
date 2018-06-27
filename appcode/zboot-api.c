@@ -15,7 +15,11 @@
 #include "zboot_util.h"
 #include "zboot.h"
 
+#if defined(ZBOOT_API_DEBUG)
+#define DEBUG(...) ets_printf(__VA_ARGS__)
+#else
 #define DEBUG(...)
+#endif
 
 extern uint32_t SPIRead(uint32_t, void*, uint32_t);
 extern void ets_printf(const char*, ...);
@@ -35,8 +39,8 @@ SpiFlashOpResult spi_flash_erase_sector(uint16_t sec);
 SpiFlashOpResult spi_flash_write(uint32_t des_addr, uint32_t *src_addr, uint32_t size);
 SpiFlashOpResult spi_flash_read(uint32_t src_addr, uint32_t *des_addr, uint32_t size);
 
-bool system_rtc_mem_read(uint8_t src_addr, void *des_addr, uint16_t load_size);
 bool system_rtc_mem_write(uint8_t des_addr, const void *src_addr, uint16_t save_size);
+bool system_rtc_mem_read(uint8_t des_addr, const void *src_addr, uint16_t save_size);
 
 /* TODO: Fix these */
 #define os_free(s)   vPortFree(s)
@@ -114,19 +118,26 @@ static bool zboot_get_rtc_data(zboot_rtc_data *rtc)
 {
    uint8_t checksum;
 
-   if(!system_rtc_mem_read(ZBOOT_RTC_ADDR, rtc, sizeof(*rtc)))
+   if(!system_rtc_mem_read(ZBOOT_RTC_ADDR/sizeof(uint32_t), rtc, sizeof(*rtc)))
    {
-      DEBUG("zboot: Failed to read RTC memory\n");
+      DEBUG("%s: Failed to read RTC memory\n", __func__);
       return false;
    }
-   checksum = esp_checksum8((uint8_t*)rtc, (sizeof(*rtc)-sizeof(uint8_t)));
-   return (rtc->chksum == checksum); 
+   checksum = zboot_rtc_checksum(rtc);
+   if(rtc->chksum != checksum)
+   {
+      DEBUG("%s: checksum mismatch calculated=%02x, expected=%02x\n",
+         __func__, checksum, rtc->chksum);
+      return false;
+   }
+
+   return true;
 }
 
 static bool zboot_set_rtc_data(zboot_rtc_data *rtc)
 {
    rtc->chksum = esp_checksum8((uint8_t*)rtc, (sizeof(*rtc)-sizeof(uint8_t)));
-   return system_rtc_mem_write(ZBOOT_RTC_ADDR, rtc, sizeof(*rtc));
+   return system_rtc_mem_write(ZBOOT_RTC_ADDR/sizeof(uint32_t), rtc, sizeof(*rtc));
 }
 
 static bool zboot_get_image_header(uint32_t offset, zimage_header *header)
@@ -215,20 +226,23 @@ bool zboot_get_current_boot_mode(uint8_t *mode)
 bool zboot_get_current_image_info(uint32_t *version, uint32_t *date,
    char *description, uint8_t maxDescriptionLength)
 {
-   zboot_config config;
    zimage_header header;
-   uint8_t bootIndex;
-   uint32_t imageAddress;
+   zboot_rtc_data rtc;
 
-   if(!zboot_get_current_boot_index(&bootIndex)
-   || !zboot_get_config(&config))
-      return false;
+   DEBUG("%s\n", __func__);
 
-   if(bootIndex >= config.count)
+   if(!zboot_get_rtc_data(&rtc))
+   {
+      DEBUG("zboot: Failed to get zboot data\n");
       return false;
-   imageAddress = config.roms[bootIndex];
-   if(!zboot_get_image_header(imageAddress, &header))
+   }
+
+   DEBUG("zboot: Current boot index %u, address %08x\n", rtc.last_rom, rtc.rom_addr);
+   if(!zboot_get_image_header(rtc.rom_addr, &header))
+   {
+      DEBUG("zboot: Failed to read image header\n");
       return false;
+   }
 
    if(NULL != version)
       *version = header.version;
@@ -360,45 +374,27 @@ bool zboot_write_flash(void *context, uint8_t *data, uint16_t len)
 
 // ----------------------------------------------------------------------------------
 
-static uint8_t rBoot_mmap_1 = 0xff;
-static uint8_t rBoot_mmap_2 = 0xff;
+static uint8_t zboot_mmap_1 = 0xff;
+static uint8_t zboot_mmap_2 = 0xff;
 
 // This function must exist in IRAM 
 void __attribute__((section(".iram.text"))) Cache_Read_Enable_New(void)
 {
-   if (rBoot_mmap_1 == 0xff)
+   if (zboot_mmap_1 == 0xff)
    {
+      volatile zboot_rtc_data *rtc =
+         (volatile zboot_rtc_data *)(ESP_RTC_MEM_START + (ZBOOT_RTC_ADDR / sizeof(uint32_t)));
       uint32_t val;
-      zboot_config conf;
 
-      SPIRead(BOOT_CONFIG_SECTOR * SECTOR_SIZE, &conf, sizeof(conf));
-
-      // rtc support here isn't written ideally, we don't read the whole structure and
-      // we don't check the checksum. However this code is only run on first boot, so
-      // the rtc data should have just been set and the user app won't have had chance
-      // to corrupt it or suspend or anything else that might upset it. And if
-      // it were bad what should we do anyway? We can't just ignore bad data here, we
-      // need it. But the main reason is that this code must be in iram, which is in
-      // very short supply, doing this "properly" increases the size about 3x
-
-      // used only to calculate offset into structure, should get optimized out
-      zboot_rtc_data rtc;
-      uint8_t off = (uint8_t*)&rtc.last_rom - (uint8_t*)&rtc;
-      // get the four bytes containing the one of interest
-      volatile uint32_t *rtcd = (uint32_t*)(0x60001100 + ZBOOT_RTC_ADDR + (off & ~3));
-      val = *rtcd;
-      // extract the one of interest
-      val = ((uint8_t*)&val)[off & 3];
       // get address of rom
-      val = conf.roms[val];
-
+      val = rtc->rom_addr;
       val /= 0x100000;
 
-      rBoot_mmap_2 = val / 2;
-      rBoot_mmap_1 = val % 2;
+      zboot_mmap_2 = val / 2;
+      zboot_mmap_1 = val % 2;
 		
-      //ets_printf("mmap %d,%d,1\r\n", rBoot_mmap_1, rBoot_mmap_2);
+      DEBUG("mmap %d,%d,1\r\n", zboot_mmap_1, zboot_mmap_2);
    }
 	
-   Cache_Read_Enable(rBoot_mmap_1, rBoot_mmap_2, 1);
+   Cache_Read_Enable(zboot_mmap_1, zboot_mmap_2, 1);
 }
