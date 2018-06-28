@@ -21,7 +21,6 @@
 #define DEBUG(...)
 #endif
 
-extern uint32_t SPIRead(uint32_t, void*, uint32_t);
 extern void ets_printf(const char*, ...);
 extern void Cache_Read_Enable(uint32_t, uint32_t, uint32_t);
 
@@ -42,11 +41,14 @@ SpiFlashOpResult spi_flash_read(uint32_t src_addr, uint32_t *des_addr, uint32_t 
 bool system_rtc_mem_write(uint8_t des_addr, const void *src_addr, uint16_t save_size);
 bool system_rtc_mem_read(uint8_t des_addr, const void *src_addr, uint16_t save_size);
 
-/* TODO: Fix these */
-#define os_free(s)   vPortFree(s)
+extern void vPortFree(void *pv);
+void *pvPortMalloc(size_t xSize);
+
+#define os_free(s) vPortFree(s)
 #define os_malloc(s) pvPortMalloc(s)
 
 /* ----------------------------------------------------------------------------------------
+ * Private Helper Functions
  */
 
 static bool zboot_get_config(zboot_config *config)
@@ -61,8 +63,11 @@ static bool zboot_get_config(zboot_config *config)
       return false;
    }
 
+   if(config->magic != ZBOOT_CONFIG_MAGIC)
+      return false;
+
    // Validate checksum
-   checksum = esp_checksum8((uint8_t *) config, sizeof(*config));
+   checksum = zboot_config_checksum(config);
    if(checksum != config->chksum)
    {
       DEBUG("zboot: Checksum mismatch on zboot config (calculated %08x, expected %08x)\n",
@@ -99,8 +104,13 @@ static bool zboot_set_config(zboot_config *config)
    }
    else
    {
-      config->chksum = esp_checksum8((uint8_t*)config, sizeof(*config) - sizeof(uint8_t)); 
-      memcpy(buffer, config, sizeof(*config));  // Always at the start of the sector
+      if(NULL != config)
+      {
+         config->chksum = zboot_config_checksum(config);
+         memcpy(buffer, config, sizeof(*config));  // Always at the start of the sector
+      }
+      else
+         memset(buffer, 0, sizeof(*config));  // Erase configuration
 
       if(spi_flash_write(BOOT_CONFIG_SECTOR * SECTOR_SIZE,
          (uint32_t*)((void*)buffer), SECTOR_SIZE) != SPI_FLASH_RESULT_OK)
@@ -223,8 +233,13 @@ bool zboot_get_current_boot_mode(uint8_t *mode)
    return true;
 }
 
+bool zboot_erase_config(void)
+{
+   return zboot_set_config(NULL);
+}
+
 bool zboot_get_current_image_info(uint32_t *version, uint32_t *date,
-   char *description, uint8_t maxDescriptionLength)
+   uint32_t *address, uint8_t *index, char *description, uint8_t maxDescriptionLength)
 {
    zimage_header header;
    zboot_rtc_data rtc;
@@ -244,6 +259,59 @@ bool zboot_get_current_image_info(uint32_t *version, uint32_t *date,
       return false;
    }
 
+   if(header.magic != ZIMAGE_MAGIC)
+      return false;
+
+   if(NULL != version)
+      *version = header.version;
+   if(NULL != date)
+      *date = header.date;
+   if(NULL != address)
+      *address = rtc.rom_addr;
+   if(NULL != index)
+      *index = rtc.last_rom;
+   if(NULL != description && maxDescriptionLength > 0)
+      strncpy(description, header.description, maxDescriptionLength);
+
+   return true;
+}
+
+bool zboot_get_image_count(uint8_t *count)
+{
+   zboot_config config;
+   if(!zboot_get_config(&config))
+      return false;
+   if(NULL != count)
+      *count = config.count;
+   return true;
+}
+
+bool zboot_get_image_info(uint8_t index, uint32_t *version, uint32_t *date,
+   uint32_t *address, char *description, uint8_t maxDescriptionLength)
+{
+   zboot_config config;
+   zimage_header header;
+
+   if(!zboot_get_config(&config))
+   {
+      DEBUG("zboot: Failed to read zboot config\n");
+      return false;
+   }
+
+   if(index > config.count)
+      return false;
+
+   if(!zboot_get_image_header(config.roms[index], &header))
+   {
+      DEBUG("zboot: Failed to read header for ROM index %u @ %08x\n", index, config.roms[index]);
+      return false;
+   }
+
+   if(header.magic != ZIMAGE_MAGIC)
+      return false;
+
+   if(NULL != address)
+      *address = config.roms[index];
    if(NULL != version)
       *version = header.version;
    if(NULL != date)

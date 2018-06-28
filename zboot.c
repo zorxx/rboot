@@ -178,6 +178,7 @@ uint32_t NOINLINE find_image(void)
       SPIEraseSector(BOOT_CONFIG_SECTOR);
       SPIWrite(BOOT_CONFIG_SECTOR * SECTOR_SIZE, buffer, SECTOR_SIZE);
    }
+
    updateConfig = false;
 
    bootIndex = config->current_rom;

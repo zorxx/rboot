@@ -107,8 +107,8 @@ typedef struct
 {
    uint32_t magic;
       #define ZIMAGE_MAGIC 0x279bfbf1
-   uint32_t count;
-   uint32_t entry;
+   uint32_t count;     // section count
+   uint32_t entry;     // entrypoint address
    uint32_t version;
    uint32_t date;
    uint32_t reserved[3];

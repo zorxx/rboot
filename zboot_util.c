@@ -42,7 +42,6 @@ void default_config(zboot_config *config, uint32_t flashsize)
 #ifdef BOOT_GPIO_SKIP_ENABLED
    config->mode = MODE_GPIO_SKIP;
 #endif
-
-   config->chksum = esp_checksum8((uint8_t*)config, sizeof(*config)-sizeof(uint8_t)); 
+   config->chksum = zboot_config_checksum(config);
 }
 
