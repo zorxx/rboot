@@ -159,17 +159,7 @@ static bool zboot_get_image_header(uint32_t offset, zimage_header *header)
 }
 
 // ----------------------------------------------------------------------------------
-// Application information 
-
-bool zboot_get_coldboot_index(uint8_t *index)
-{
-   zboot_config config;
-   if(!zboot_get_config(&config))
-      return false;
-   if(NULL != index)
-      *index = config.current_rom;
-   return true;
-}
+// Set Operations
 
 bool zboot_set_coldboot_index(uint8_t index)
 {
@@ -191,9 +181,28 @@ bool zboot_set_gpio_number(uint8_t index)
    return zboot_set_config(&config);
 }
 
+bool zboot_invalidate_index(uint8_t index)
+{
+   zboot_config config;
+   int32_t sector;
+   if(!zboot_get_config(&config))
+      return false;
+   if(index >= config.count)
+      return false;
+   sector = config.roms[index] / SECTOR_SIZE;
+   return (spi_flash_erase_sector(sector) == SPI_FLASH_RESULT_OK);
+}
+
 bool zboot_set_temp_index(uint8_t index)
 {
    zboot_rtc_data rtc;
+   zboot_config config;
+
+   if(!zboot_get_config(&config))
+      return false;
+   if(index >= config.count)
+      return false;
+
    if(!zboot_get_rtc_data(&rtc))
    {
       DEBUG("zboot: Invalid RTC data; reinitializing\n");
@@ -204,6 +213,36 @@ bool zboot_set_temp_index(uint8_t index)
    rtc.next_mode = MODE_TEMP_ROM;
    rtc.next_rom = index;
    return zboot_set_rtc_data(&rtc);
+}
+
+bool zboot_erase_config(void)
+{
+   return zboot_set_config(NULL);
+}
+
+// ----------------------------------------------------------------------------------
+// Get Operations
+
+bool zboot_get_coldboot_index(uint8_t *index)
+{
+   zboot_config config;
+   if(!zboot_get_config(&config))
+      return false;
+   if(NULL != index)
+      *index = config.current_rom;
+   return true;
+}
+
+bool zboot_get_image_address(uint8_t index, uint32_t *address)
+{
+   zboot_config config;
+   if(!zboot_get_config(&config))
+      return false;
+   if(index >= config.count)
+      return false;
+   if(NULL != address)
+      *address = config.roms[index];
+   return true;
 }
 
 bool zboot_get_current_boot_index(uint8_t *index)
@@ -231,11 +270,6 @@ bool zboot_get_current_boot_mode(uint8_t *mode)
    if(NULL != mode)
       *mode = rtc.last_mode;
    return true;
-}
-
-bool zboot_erase_config(void)
-{
-   return zboot_set_config(NULL);
 }
 
 bool zboot_get_current_image_info(uint32_t *version, uint32_t *date,
@@ -274,6 +308,61 @@ bool zboot_get_current_image_info(uint32_t *version, uint32_t *date,
       strncpy(description, header.description, maxDescriptionLength);
 
    return true;
+}
+
+bool zboot_find_best_write_index(uint8_t *index, bool overwriteOldest)
+{
+   uint8_t idx, best_index = 0;
+   uint32_t best_date = 0xffffffff;
+   bool found = false;
+   zboot_config config;
+   zboot_rtc_data rtc;
+
+   if(!zboot_get_rtc_data(&rtc))
+   {
+      DEBUG("zboot: Failed to get zboot data\n");
+      return false;
+   }
+
+   if(!zboot_get_config(&config))
+   {
+      DEBUG("zboot: Failed to read zboot config\n");
+      return false;
+   }
+
+   for(idx = 0; idx < config.count; ++idx)
+   {
+      uint32_t date;
+      if(idx == rtc.last_rom)
+      {
+         // not possible to overwrite currently-executing image
+      }
+      else if(zboot_get_image_info(idx, NULL, &date, NULL, NULL, 0))
+      {
+         if(overwriteOldest && (date < best_date))
+         {
+            best_index = idx;
+            best_date = date;
+            found = true;
+         }
+      }
+      else
+      {
+         found = true;
+         best_index = idx;
+         break;  // Stop search
+      }
+   }
+
+   if(!found)
+   {
+      best_index = (rtc.last_rom + 1) % config.count;
+      found = (best_index != rtc.last_rom);
+   }
+
+   if(found && index != NULL)
+      *index = best_index;
+   return found;
 }
 
 bool zboot_get_image_count(uint8_t *count)
@@ -360,6 +449,7 @@ void *zboot_write_init(uint32_t start_addr)
 bool zboot_write_end(void *context)
 {
    zboot_write_status *status = (zboot_write_status *) context;
+   bool result = false;
 
    if(!status->active)
    {
@@ -372,9 +462,13 @@ bool zboot_write_end(void *context)
    {
       for (uint8_t i = status->extra_count; i < 4; ++i)
          status->extra_bytes[i] = 0xff;
-      return zboot_write_flash(status, status->extra_bytes, 4);
+      result = zboot_write_flash(status, status->extra_bytes, 4);
    }
-   return true;
+   else
+      result = true;
+
+   status->active = false;
+   return result;
 }
 
 // function to do the actual writing to flash
@@ -442,27 +536,10 @@ bool zboot_write_flash(void *context, uint8_t *data, uint16_t len)
 
 // ----------------------------------------------------------------------------------
 
-static uint8_t zboot_mmap_1 = 0xff;
-static uint8_t zboot_mmap_2 = 0xff;
-
-// This function must exist in IRAM 
-void __attribute__((section(".iram.text"))) Cache_Read_Enable_New(void)
+void __attribute__((section(".entry.text"))) Cache_Read_Enable_New(void)
 {
-   if (zboot_mmap_1 == 0xff)
-   {
-      volatile zboot_rtc_data *rtc =
-         (volatile zboot_rtc_data *)(ESP_RTC_MEM_START + (ZBOOT_RTC_ADDR / sizeof(uint32_t)));
-      uint32_t val;
-
-      // get address of rom
-      val = rtc->rom_addr;
-      val /= 0x100000;
-
-      zboot_mmap_2 = val / 2;
-      zboot_mmap_1 = val % 2;
-		
-      DEBUG("mmap %d,%d,1\r\n", zboot_mmap_1, zboot_mmap_2);
-   }
-	
-   Cache_Read_Enable(zboot_mmap_1, zboot_mmap_2, 1);
+   volatile zboot_rtc_data *rtc =
+      (volatile zboot_rtc_data *)(ESP_RTC_MEM_START + (ZBOOT_RTC_ADDR / sizeof(uint32_t)));
+   uint32_t val = rtc->rom_addr / 0x100000;
+   Cache_Read_Enable(val & 0x1, val >> 1, 1);
 }
