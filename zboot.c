@@ -182,7 +182,7 @@ uint32_t NOINLINE find_image(void)
    updateConfig = false;
 
    bootIndex = config->current_rom;
-   bootMode = MODE_STANDARD;
+   bootMode = ZBOOT_MODE_STANDARD;
 
    // Read RTC memory to determine if we've done a warm reset and
    //  a temporary ROM was selected
@@ -196,7 +196,7 @@ uint32_t NOINLINE find_image(void)
    }
    else
    {
-      if (rtc.next_mode == MODE_TEMP_ROM)
+      if (rtc.next_mode == ZBOOT_MODE_TEMP_ROM)
       {
          if (rtc.next_rom >= config->count)
          {
@@ -205,17 +205,17 @@ uint32_t NOINLINE find_image(void)
          else
          {
             ets_printf("Booting temporary ROM index %u\n", rtc.next_rom);
-            bootMode = MODE_TEMP_ROM; 
+            bootMode = ZBOOT_MODE_TEMP_ROM;
             bootIndex = rtc.next_rom;
          }
       }
    }
 
-   if(bootMode == MODE_STANDARD)
+   if(bootMode == ZBOOT_MODE_STANDARD)
    {
       switch(config->mode)
       {
-         case MODE_GPIO_ROM:
+         case ZBOOT_MODE_GPIO_ROM:
             if(gpio_asserted(config->gpio_num))
             {
                if(config->gpio_rom < config->count)
@@ -226,19 +226,19 @@ uint32_t NOINLINE find_image(void)
                {
                   bootIndex = config->gpio_rom;
                   ets_printf("Booting GPIO-selected ROM index %u\n", bootIndex);
-                  bootMode = MODE_GPIO_ROM;
+                  bootMode = ZBOOT_MODE_GPIO_ROM;
                }
             }
             break;
 
-         case MODE_GPIO_SKIP:
+         case ZBOOT_MODE_GPIO_SKIP:
             if(gpio_asserted(config->gpio_num))
             {
                bootIndex = config->current_rom + 1;
                if(bootIndex >= config->count)
                   bootIndex = 0;
                ets_printf("Booting GPIO-skip ROM index %u\n", bootIndex);
-               bootMode = MODE_GPIO_SKIP;
+               bootMode = ZBOOT_MODE_GPIO_SKIP;
             }
             break;
          default:
@@ -279,7 +279,7 @@ uint32_t NOINLINE find_image(void)
       return 0;
    }
 
-   if(config->options & OPTION_GPIO_ERASES_SDKCONFIG)
+   if(config->options & ZBOOT_OPTION_GPIO_ERASES_SDKCONFIG)
    {
       uint8_t sec;
       ets_printf("Erasing SDK config sectors before booting.\r\n");
@@ -290,8 +290,8 @@ uint32_t NOINLINE find_image(void)
    }
 
    // re-write config, if required
-   if((config->options & OPTION_UPDATE_BOOT_INDEX) &&
-      (config->mode != MODE_TEMP_ROM) &&
+   if((config->options & ZBOOT_OPTION_UPDATE_BOOT_INDEX) &&
+      (config->mode != ZBOOT_MODE_TEMP_ROM) &&
       (bootIndex != config->current_rom))
    {
       ets_printf("Updating zboot config with ROM index %u\n", bootIndex);
@@ -303,7 +303,7 @@ uint32_t NOINLINE find_image(void)
 
    // set rtc boot data for app to read
    rtc.magic = ZBOOT_RTC_MAGIC;
-   rtc.next_mode = MODE_STANDARD;
+   rtc.next_mode = ZBOOT_MODE_STANDARD;
    rtc.last_mode = bootMode; 
    rtc.last_rom = bootIndex; 
    rtc.rom_addr = config->roms[bootIndex];

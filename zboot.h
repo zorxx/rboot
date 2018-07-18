@@ -12,6 +12,7 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include "appcode/zboot-api.h"
 
 #define ZBOOT_VERSION_MAJOR        1
 #define ZBOOT_VERSION_MINOR        0
@@ -58,20 +59,13 @@ extern "C" {
 typedef struct {
    uint32_t magic;
       #define ZBOOT_CONFIG_MAGIC 0xdcce4b28 
-   uint8_t mode;
-      #define MODE_STANDARD    0x00
-      #define MODE_GPIO_ROM    0x01
-      #define MODE_TEMP_ROM    0x02
-      #define MODE_GPIO_SKIP   0x03
-      #define MODE_FAILSAFE    0x04
+   uint8_t mode;            /* one of ZBOOT_MODE_* */
    uint8_t current_rom;     ///< Currently selected ROM (will be used for next standard boot)
    uint8_t gpio_rom;        ///< ROM to use for GPIO boot (hardware switch) with mode set to MODE_GPIO_ROM
    uint8_t count;           ///< Quantity of ROMs available to boot
    uint32_t roms[MAX_ROMS]; ///< Flash addresses of each ROM
    uint8_t failsafe_rom;
-   uint8_t options; 
-      #define OPTION_GPIO_ERASES_SDKCONFIG 0x01
-      #define OPTION_UPDATE_BOOT_INDEX     0x02
+   uint8_t options;         /* one of ZBOOT_OPTION_* */
    uint8_t gpio_num;
    uint8_t chksum;          ///< Checksum of this configuration structure
 } zboot_config;

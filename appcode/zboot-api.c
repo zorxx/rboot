@@ -193,6 +193,38 @@ bool zboot_invalidate_index(uint8_t index)
    return (spi_flash_erase_sector(sector) == SPI_FLASH_RESULT_OK);
 }
 
+bool zboot_set_boot_mode(uint8_t mode)
+{
+   zboot_config config;
+   if(!zboot_get_config(&config))
+      return false;
+   config.mode = mode;
+   return zboot_set_config(&config);
+}
+
+bool zboot_set_option(uint8_t option, bool enable)
+{
+   zboot_config config;
+   if(!zboot_get_config(&config))
+      return false;
+   if(enable)
+      config.options |= option;
+   else
+      config.options &= ~option;
+   return zboot_set_config(&config);
+}
+
+bool zboot_set_failsafe_index(uint8_t index)
+{
+   zboot_config config;
+   if(!zboot_get_config(&config))
+      return false;
+   if(index >= config.count)
+      return false;
+   config.failsafe_rom = index;
+   return zboot_set_config(&config);
+}
+
 bool zboot_set_temp_index(uint8_t index)
 {
    zboot_rtc_data rtc;
@@ -207,10 +239,10 @@ bool zboot_set_temp_index(uint8_t index)
    {
       DEBUG("zboot: Invalid RTC data; reinitializing\n");
       rtc.magic = ZBOOT_RTC_MAGIC;
-      rtc.last_mode = MODE_STANDARD;
+      rtc.last_mode = ZBOOT_MODE_STANDARD;
       rtc.last_rom = 0;
    }
-   rtc.next_mode = MODE_TEMP_ROM;
+   rtc.next_mode = ZBOOT_MODE_TEMP_ROM;
    rtc.next_rom = index;
    return zboot_set_rtc_data(&rtc);
 }
@@ -230,6 +262,50 @@ bool zboot_get_coldboot_index(uint8_t *index)
       return false;
    if(NULL != index)
       *index = config.current_rom;
+   return true;
+}
+
+bool zboot_get_failsafe_index(uint8_t *index)
+{
+   zboot_config config;
+   if(!zboot_get_config(&config))
+      return false;
+   if(config.failsafe_rom >= config.count)
+      return false;
+   if(NULL != index)
+      *index = config.failsafe_rom;
+   return true;
+}
+
+bool zboot_get_temp_index(uint8_t *index)
+{
+   zboot_rtc_data rtc;
+   if(!zboot_get_rtc_data(&rtc))
+      return false;
+   if(rtc.next_mode != ZBOOT_MODE_TEMP_ROM)
+      return false;
+   if(NULL != index)
+      *index = rtc.next_rom;
+   return true;
+}
+
+bool zboot_get_boot_mode(uint8_t *mode)
+{
+   zboot_config config;
+   if(!zboot_get_config(&config))
+      return false;
+   if(NULL != mode)
+      *mode = config.mode;
+   return true;
+}
+
+bool zboot_get_options(uint8_t *options)
+{
+   zboot_config config;
+   if(!zboot_get_config(&config))
+      return false;
+   if(NULL != options)
+      *options = config.options;
    return true;
 }
 
