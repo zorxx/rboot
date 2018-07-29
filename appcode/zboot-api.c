@@ -549,12 +549,13 @@ bool zboot_write_end(void *context)
 
 // function to do the actual writing to flash
 // call repeatedly with more data (max len per write is the flash sector size (4k))
-bool zboot_write_flash(void *context, uint8_t *data, uint16_t len)
+bool zboot_write_flash(void *context, const uint8_t *data, const uint16_t len)
 {
    zboot_write_status *status = (zboot_write_status *) context;
    bool success = true;
    uint8_t *buffer;
    int32_t lastsect;
+   uint16_t length = len;
 	
    if (data == NULL || len == 0)
       return true;  // Assume we're done
@@ -573,14 +574,14 @@ bool zboot_write_flash(void *context, uint8_t *data, uint16_t len)
    memcpy(buffer + status->extra_count, data, len);
 
    // Write length must be multiple of 4; save any remaining bytes for next chunk 
-   len += status->extra_count;
-   status->extra_count = len % 4;
-   len -= status->extra_count;
-   memcpy(status->extra_bytes, buffer + len, status->extra_count);
+   length += status->extra_count;
+   status->extra_count = length % 4;
+   length -= status->extra_count;
+   memcpy(status->extra_bytes, buffer + length, status->extra_count);
 
    // Ensure new chunk will fit 
    if ((status->last_sector >= 0) && 
-       (status->start_addr + len) > (status->last_sector * SECTOR_SIZE))
+       (status->start_addr + length) > (status->last_sector * SECTOR_SIZE))
    {
       DEBUG("zboot: Flash overrun\n");
       success = false;
@@ -588,7 +589,7 @@ bool zboot_write_flash(void *context, uint8_t *data, uint16_t len)
    else
    {
       // erase any additional sectors needed by this chunk
-      lastsect = ((status->start_addr + len) - 1) / SECTOR_SIZE;
+      lastsect = ((status->start_addr + length) - 1) / SECTOR_SIZE;
       while (lastsect > status->last_sector_erased)
       {
          ++(status->last_sector_erased);
@@ -596,14 +597,13 @@ bool zboot_write_flash(void *context, uint8_t *data, uint16_t len)
       }
 
       // write current chunk
-      //os_printf("write addr: 0x%08x, len: 0x%04x\r\n", status->start_addr, len);
-      if (spi_flash_write(status->start_addr, (uint32_t *)((void*)buffer), len) != SPI_FLASH_RESULT_OK)
+      if (spi_flash_write(status->start_addr, (uint32_t *)((void*)buffer), length) != SPI_FLASH_RESULT_OK)
       {
          DEBUG("zboot: Flash write failed\n");
          success = false;
       }
       else
-         status->start_addr += len;
+         status->start_addr += length;
    }
 
    os_free(buffer);

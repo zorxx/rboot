@@ -49,7 +49,7 @@ bool zboot_get_image_info(uint8_t index, uint32_t *version, uint32_t *date,
 
 void *zboot_write_init(uint32_t start_addr);
 bool zboot_write_end(void *context);
-bool zboot_write_flash(void *context, uint8_t *data, uint16_t len);
+bool zboot_write_flash(void *context, const uint8_t *data, const uint16_t len);
 
 #ifdef __cplusplus
 }
