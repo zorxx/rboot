@@ -21,8 +21,8 @@
 #define UART_CLK_FREQ	(26000000 * 2)
 #endif
 
-//#define DEBUG(...)  ets_printf(__VA_ARGS__)
-#define DEBUG(...)
+//#define DBG(...)  ets_printf(__VA_ARGS__)
+#define DBG(...)
 
 // --------------------------------------------------------------------------------------------------
 // Images 
@@ -39,13 +39,13 @@ static uint32_t check_image(uint32_t readpos)
 
    if (readpos == 0 || readpos == 0xffffffff)
    {
-      DEBUG("Invalid section start address (%08x)\n", start_pos);
+      DBG("Invalid section start address (%08x)\n", start_pos);
       return 0;
    }
 
    if (SPIRead(readpos, zheader, sizeof(*zheader)) != 0)
    {
-      DEBUG("Failed to read header (%u bytes)\n", sizeof(*zheader));
+      DBG("Failed to read header (%u bytes)\n", sizeof(*zheader));
       return 0;
    }
    readpos += sizeof(*zheader);
@@ -53,17 +53,17 @@ static uint32_t check_image(uint32_t readpos)
    // Sanity-check header 
    if(zheader->magic != ZIMAGE_MAGIC)
    {
-      DEBUG("Invalid header magic (%08x, expected %08x)\n", zheader->magic, ZIMAGE_MAGIC);
+      DBG("Invalid header magic (%08x, expected %08x)\n", zheader->magic, ZIMAGE_MAGIC);
       return 0;
    }
    if(zheader->count > 256)
    {
-      DEBUG("Invalid section count (%u)\n", zheader->count);
+      DBG("Invalid section count (%u)\n", zheader->count);
       return 0;
    }
    if(zheader->entry < 0x40100000 || zheader->entry >= 0x40180000)
    {
-      DEBUG("Invalid entrypoint (%08x)\n", zheader->entry);
+      DBG("Invalid entrypoint (%08x)\n", zheader->entry);
       return 0;
    }
 
@@ -81,7 +81,7 @@ static uint32_t check_image(uint32_t readpos)
       if (SPIRead(readpos, sect, sizeof(*sect)) != 0
       || (sect->length % sizeof(uint32_t) != 0))
       {
-         DEBUG("Section %u, invalid length (%08x)\n", i, sect->length);
+         DBG("Section %u, invalid length (%08x)\n", i, sect->length);
          return 0;
       }
       readpos += sizeof(*sect);
@@ -98,7 +98,7 @@ static uint32_t check_image(uint32_t readpos)
 
          if (SPIRead(readpos, buffer, readlen) != 0)
          {
-            DEBUG("Failed to read section %u data at offset (%08x)\n", i, remaining);
+            DBG("Failed to read section %u data at offset (%08x)\n", i, remaining);
             return 0;
          }
          readpos += readlen;
@@ -110,13 +110,13 @@ static uint32_t check_image(uint32_t readpos)
 
    if (SPIRead(readpos, &value, sizeof(value)) != 0)
    {
-      DEBUG("Failed to read checksum from flash\n"); 
+      DBG("Failed to read checksum from flash\n"); 
       return 0;
    }
 
    if(value != chksum)
    {
-      DEBUG("Checksum mismatch (calculated %08x, expected %08x))\n", chksum, value); 
+      DBG("Checksum mismatch (calculated %08x, expected %08x))\n", chksum, value); 
       return 0;
    }
 
@@ -262,7 +262,7 @@ uint32_t NOINLINE find_image(void)
       if(tryIndex >= config->count)
          tryIndex = 0;
       tryAddress = config->roms[tryIndex];
-      DEBUG("Checking image %u @ %08x\n", tryIndex, tryAddress); 
+      DBG("Checking image %u @ %08x\n", tryIndex, tryAddress); 
 
       runAddr = check_image(tryAddress);
       if(0 == runAddr)
