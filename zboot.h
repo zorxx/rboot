@@ -84,7 +84,9 @@ typedef struct {
    uint8_t last_rom;         ///< The last (this) boot rom number
    uint8_t next_rom;         ///< The next boot rom number when next_mode set to MODE_TEMP_ROM
    uint32_t rom_addr;
-   uint8_t reserved[3];
+   uint8_t spi_speed;
+   uint8_t spi_size;
+   uint8_t spi_mode;
    uint8_t chksum;
 } zboot_rtc_data;
 #pragma pack(pop)
@@ -97,6 +99,7 @@ typedef struct {
 #define ZIMAGE_HEADER_OFFSET_VERSION 3
 #define ZIMAGE_HEADER_OFFSET_DATE    4
 
+#pragma pack(push,0)
 typedef struct
 {
    uint32_t magic;
@@ -108,6 +111,7 @@ typedef struct
    uint32_t reserved[3];
    char     description[88];
 } zimage_header;
+#pragma pack(pop)
 
 #ifdef __cplusplus
 }

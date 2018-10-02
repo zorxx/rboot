@@ -22,7 +22,7 @@
 #endif
 
 extern void ets_printf(const char*, ...);
-extern void Cache_Read_Enable(uint32_t, uint32_t, uint32_t);
+extern void Cache_Read_Enable_original(uint8_t, uint8_t, uint8_t);
 
 /* ----------------------------------------------------------------------------------------
  * Espressif SDK definitions.
@@ -612,10 +612,17 @@ bool zboot_write_flash(void *context, const uint8_t *data, const uint16_t len)
 
 // ----------------------------------------------------------------------------------
 
+#define CACHE_READ_ENABLE()                                                                 \
+   volatile zboot_rtc_data *rtc =                                                           \
+      (volatile zboot_rtc_data *)(ESP_RTC_MEM_START + (ZBOOT_RTC_ADDR / sizeof(uint32_t))); \
+   Cache_Read_Enable_original((rtc->rom_addr >> 20) & 1, (rtc->rom_addr >> 21) & 1, 1);
+
 void __attribute__((section(".entry.text"))) Cache_Read_Enable_New(void)
 {
-   volatile zboot_rtc_data *rtc =
-      (volatile zboot_rtc_data *)(ESP_RTC_MEM_START + (ZBOOT_RTC_ADDR / sizeof(uint32_t)));
-   uint32_t val = rtc->rom_addr / 0x100000;
-   Cache_Read_Enable(val & 0x1, val >> 1, 1);
+   CACHE_READ_ENABLE();
+}
+
+void __attribute__((section(".entry.text"))) Cache_Read_Enable(uint8_t a, uint8_t b, uint8_t c)
+{
+   CACHE_READ_ENABLE();
 }

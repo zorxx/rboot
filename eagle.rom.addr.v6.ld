@@ -345,3 +345,5 @@ PROVIDE ( xthal_window_spill_nw = 0x4000e320 );
 PROVIDE ( Te0 = 0x3fffccf0 );
 PROVIDE ( UartDev = 0x3fffde10 );
 PROVIDE ( flashchip = 0x3fffc714);
+PROVIDE ( Enable_QMode = 0x400044c0 );
+PROVIDE ( Disable_QMode = 0x40004508 );

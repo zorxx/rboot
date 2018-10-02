@@ -9,17 +9,11 @@
 
 #include "zboot.h"
 
-#define NOINLINE __attribute__ ((noinline))
-
 #define ROM_MAGIC      0xe9
 #define ROM_MAGIC_NEW1 0xea
 #define ROM_MAGIC_NEW2 0x04
 
-// buffer size, must be at least 0x100 (size of zimage_header structure)
-#define BUFFER_SIZE 0x100
-
-// stage2 read chunk maximum size (limit for SPIRead)
-#define READ_SIZE 0x1000
+#define BUFFER_SIZE 0x1000
 
 // esp8266 built in ROM functions
 extern uint32_t SPIRead(uint32_t addr, void *outptr, uint32_t len);

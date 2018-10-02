@@ -20,9 +20,10 @@ else
 Q := @
 endif
 
-CFLAGS = -Os -O3 -Wpointer-arith -Wundef -Werror -Wl,-EL -fno-inline-functions -nostdlib -mlongcalls -mtext-section-literals  -D__ets__ -DICACHE_FLASH -DDEBUG=0 -D_GNU_SOURCE
+CFLAGS = -Os -O3 -Wpointer-arith -Wundef -Werror -Wl,-EL -fno-inline-functions -nostdlib -mlongcalls -mtext-section-literals  -D__ets__ -DICACHE_FLASH -DDEBUG=0 -D_GNU_SOURCE -I esp8266
 LDFLAGS = -nostdlib -Wl,--no-check-sections -u call_user_start -Wl,-static -Wl,-Map=$(ZBOOT_BUILD_BASE)/zboot.map
-LD_SCRIPT = eagle.app.v6.ld
+LD_SCRIPT = zboot.ld
+VPATH := esp8266
 
 ifneq ($(ZBOOT_DELAY_MICROS),)
 	CFLAGS += -DBOOT_DELAY_MICROS=$(ZBOOT_DELAY_MICROS)
@@ -61,7 +62,7 @@ CFLAGS += $(addprefix -I,.)
 
 .SECONDARY:
 
-ZBOOT_FILES := zboot.c zboot_util.c espgpio.c esprom.c esprtc.c
+ZBOOT_FILES := zboot.c zboot_util.c espgpio.c esprom.c esprtc.c #chip_boot.c spi_flash.c
 
 all: $(ZBOOT_BUILD_BASE) $(ZBOOT_FW_BASE) $(ZBOOT_FW_BASE)/zboot.bin
 
@@ -71,19 +72,7 @@ $(ZBOOT_BUILD_BASE):
 $(ZBOOT_FW_BASE):
 	$(Q) mkdir -p $@
 
-$(ZBOOT_BUILD_BASE)/zboot_stage2a.o: zboot_stage2a.c zboot_private.h zboot.h
-	@echo "CC $<"
-	$(Q) $(CC) $(CFLAGS) -c $< -o $@
-
-$(ZBOOT_BUILD_BASE)/zboot_stage2a.elf: $(ZBOOT_BUILD_BASE)/zboot_stage2a.o
-	@echo "LD $@"
-	$(Q) $(LD) -Tzboot_stage2a.ld $(LDFLAGS) -Wl,--start-group $^ -Wl,--end-group -o $@
-
-$(ZBOOT_BUILD_BASE)/zboot_hex2a.h: $(ZBOOT_BUILD_BASE)/zboot_stage2a.elf
-	@echo "ZB $@"
-	$(Q) $(ZTOOL) -d0 -i -e $< -o $@ -s ".text"
-
-$(ZBOOT_BUILD_BASE)/zboot.o: zboot.c zboot_private.h zboot.h $(ZBOOT_BUILD_BASE)/zboot_hex2a.h
+$(ZBOOT_BUILD_BASE)/zboot.o: zboot.c zboot_private.h zboot.h
 	@echo "CC $<"
 	$(Q) $(CC) $(CFLAGS) -I$(ZBOOT_BUILD_BASE) -c $< -o $@
 
@@ -97,7 +86,7 @@ $(ZBOOT_BUILD_BASE)/%.elf: $(foreach file,$(ZBOOT_FILES),$(ZBOOT_BUILD_BASE)/$(f
 
 $(ZBOOT_FW_BASE)/%.bin: $(ZBOOT_BUILD_BASE)/%.elf
 	@echo "ZB $@"
-	$(Q) $(ZTOOL) -d3 -b -c$(SPI_SIZE) -m$(SPI_MODE) -f$(SPI_SPEED) -e$< -o$@ -s".text .rodata"
+	$(Q) $(ZTOOL) -d 0 -b -c$(SPI_SIZE) -m$(SPI_MODE) -f$(SPI_SPEED) -e$< -o$@ -s".text .final .rodata"
 
 clean:
 	@echo "RM $(ZBOOT_BUILD_BASE) $(ZBOOT_FW_BASE)"
