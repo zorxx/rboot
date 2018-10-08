@@ -23,6 +23,8 @@
 extern "C" {
 #endif
 
+void zboot_api_init(void);
+
 bool zboot_set_coldboot_index(uint8_t index);
 bool zboot_set_temp_index(uint8_t index);
 bool zboot_set_failsafe_index(uint8_t index);

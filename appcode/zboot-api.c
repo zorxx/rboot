@@ -21,6 +21,24 @@
 #define DEBUG(...)
 #endif
 
+#if defined(ARDUINO_ARCH_ESP8266)
+
+extern void vPortFree(void *pv);
+void *pvPortMalloc(size_t xSize);
+#define os_free(s) vPortFree(s)
+#define os_malloc(s) pvPortMalloc(s)
+
+#else
+
+#include <malloc.h>
+#define os_free(s) free(s)
+#define os_malloc(s) malloc(s)
+
+#endif
+
+static zboot_rtc_data g_zboot_rtc;
+static bool g_zboot_rtc_set = false;
+
 extern void ets_printf(const char*, ...);
 extern void Cache_Read_Enable_original(uint8_t, uint8_t, uint8_t);
 
@@ -40,12 +58,6 @@ SpiFlashOpResult spi_flash_read(uint32_t src_addr, uint32_t *des_addr, uint32_t 
 
 bool system_rtc_mem_write(uint8_t des_addr, const void *src_addr, uint16_t save_size);
 bool system_rtc_mem_read(uint8_t des_addr, const void *src_addr, uint16_t save_size);
-
-extern void vPortFree(void *pv);
-void *pvPortMalloc(size_t xSize);
-
-#define os_free(s) vPortFree(s)
-#define os_malloc(s) pvPortMalloc(s)
 
 /* ----------------------------------------------------------------------------------------
  * Private Helper Functions
@@ -128,6 +140,12 @@ static bool zboot_get_rtc_data(zboot_rtc_data *rtc)
 {
    uint8_t checksum;
 
+   if(g_zboot_rtc_set)
+   {
+      memcpy(rtc, &g_zboot_rtc, sizeof(*rtc));
+      return true;
+   }
+
    if(!system_rtc_mem_read(ZBOOT_RTC_ADDR/sizeof(uint32_t), rtc, sizeof(*rtc)))
    {
       DEBUG("%s: Failed to read RTC memory\n", __func__);
@@ -141,6 +159,8 @@ static bool zboot_get_rtc_data(zboot_rtc_data *rtc)
       return false;
    }
 
+   memcpy(&g_zboot_rtc, rtc, sizeof(*rtc));
+   g_zboot_rtc_set = true;
    return true;
 }
 
@@ -611,6 +631,13 @@ bool zboot_write_flash(void *context, const uint8_t *data, const uint16_t len)
 }
 
 // ----------------------------------------------------------------------------------
+
+void zboot_api_init(void)
+{
+   zboot_rtc_data rtc;
+
+   zboot_get_rtc_data(&rtc);
+}
 
 #define CACHE_READ_ENABLE()                                                                 \
    volatile zboot_rtc_data *rtc =                                                           \
