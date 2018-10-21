@@ -98,7 +98,7 @@ void __attribute__((section(".final.text"))) load_rom(uint32_t start_addr)
       "l32i a5, a5, 0\n"
       "memw\n"
 
-      "movi a4, 1\n"              // Cache_Read_Enable parameter 3 = 1 (32kB cache size)
+      "movi a4, 1\n"
 
       "addi a2, a5, 0\n"          // Cache_Read_Enable parameter 1 = (app_flash_base >> 20) & 1
       "srai a2, a2, 20\n"
@@ -112,6 +112,7 @@ void __attribute__((section(".final.text"))) load_rom(uint32_t start_addr)
       "l32i a0, a0, 0\n"
       "memw\n"
 
+      "movi a4, 0\n"              // Cache_Read_Enable parameter 3 = 1 (16kB cache size)
       "movi a1, 0x40000000\n"     // Reset the stack pointer; point of no return
 
       // Jump to Cache_Read_Enable (don't make a function call).

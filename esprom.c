@@ -5,6 +5,7 @@
  * Based on rBoot from Richard A. Burton
  */
 #include <stdlib.h>
+#include "zboot-api.h"
 #include "esprom.h"
 
 #define BIT5 (1 << 5)
@@ -36,19 +37,19 @@ bool esprom_get_flash_info(uint32_t *size, rom_header *header)
 
    ets_printf("Flash: ");
    spi_size = header->flags2 >> 4;
-   if (spi_size == 0) {
+   if (spi_size == ZBOOT_FLASH_SIZE_4MBIT) {
       ets_printf("4");
       flashsize = 0x80000;
-   } else if (spi_size == 1) {
+   } else if (spi_size == ZBOOT_FLASH_SIZE_2MBIT) {
       ets_printf("2");
       flashsize = 0x40000;
-   } else if (spi_size == 2) {
+   } else if (spi_size == ZBOOT_FLASH_SIZE_8MBIT) {
       ets_printf("8");
       flashsize = 0x100000;
-   } else if (spi_size == 3) {
+   } else if (spi_size == ZBOOT_FLASH_SIZE_16MBIT) {
       ets_printf("16");
       flashsize = 0x200000;
-   } else if (spi_size == 4) {
+   } else if (spi_size == ZBOOT_FLASH_SIZE_32MBIT) {
       ets_printf("32");
       flashsize = 0x400000;
    } else
@@ -56,25 +57,25 @@ bool esprom_get_flash_info(uint32_t *size, rom_header *header)
    ets_printf(" Mbit, ");
 
    spi_mode = header->flags1;
-   if (spi_mode == 0) 
+   if (spi_mode == ZBOOT_FLASH_MODE_QIO)
       ets_printf("QIO, ");
-   else if (spi_mode == 1)
+   else if (spi_mode == ZBOOT_FLASH_MODE_QOUT)
       ets_printf("QOUT, ");
-   else if (spi_mode == 2)
+   else if (spi_mode == ZBOOT_FLASH_MODE_DIO)
       ets_printf("DIO, ");
-   else if (spi_mode == 3)
+   else if (spi_mode == ZBOOT_FLASH_MODE_DOUT)
       ets_printf("DOUT, ");
    else
       ets_printf("unknown mode, ");
 
    spi_speed = header->flags2 & 0x0f;
-   if (spi_speed == 0)
+   if (spi_speed == ZBOOT_FLASH_SPEED_40MHZ)
       ets_printf("40");
-   else if (spi_speed == 1)
+   else if (spi_speed == ZBOOT_FLASH_SPEED_26_7MHZ)
       ets_printf("26.7");
-   else if (spi_speed == 2)
+   else if (spi_speed == ZBOOT_FLASH_SPEED_20MHZ)
       ets_printf("20");
-   else if (spi_speed == 0x0f)
+   else if (spi_speed == ZBOOT_FLASH_SPEED_80MHZ)
       ets_printf("80");
    else
       ets_printf("unknown speed");

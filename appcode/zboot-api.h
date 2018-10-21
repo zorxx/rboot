@@ -16,6 +16,22 @@
 #define ZBOOT_MODE_GPIO_SKIP   0x03
 #define ZBOOT_MODE_FAILSAFE    0x04
 
+#define ZBOOT_FLASH_SIZE_4MBIT   0
+#define ZBOOT_FLASH_SIZE_2MBIT   1
+#define ZBOOT_FLASH_SIZE_8MBIT   2
+#define ZBOOT_FLASH_SIZE_16MBIT  3
+#define ZBOOT_FLASH_SIZE_32MBIT  4
+
+#define ZBOOT_FLASH_MODE_QIO   0
+#define ZBOOT_FLASH_MODE_QOUT  1
+#define ZBOOT_FLASH_MODE_DIO   2
+#define ZBOOT_FLASH_MODE_DOUT  3
+
+#define ZBOOT_FLASH_SPEED_40MHZ     0
+#define ZBOOT_FLASH_SPEED_26_7MHZ   1
+#define ZBOOT_FLASH_SPEED_20MHZ     2
+#define ZBOOT_FLASH_SPEED_80MHZ    15
+
 #define ZBOOT_OPTION_GPIO_ERASES_SDKCONFIG 0x01
 #define ZBOOT_OPTION_UPDATE_BOOT_INDEX     0x02
 
@@ -48,6 +64,10 @@ bool zboot_find_best_write_index(uint8_t *index, bool overwriteOldest);
 bool zboot_get_image_count(uint8_t *count);
 bool zboot_get_image_info(uint8_t index, uint32_t *version, uint32_t *date,
    uint32_t *address, char *description, uint8_t maxDescriptionLength);
+
+bool zboot_get_flash_size(uint8_t *size);
+bool zboot_get_flash_speed(uint8_t *speed);
+bool zboot_get_flash_mode(uint8_t *mode);
 
 void *zboot_write_init(uint32_t start_addr);
 bool zboot_write_end(void *context);

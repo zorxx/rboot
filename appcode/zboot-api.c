@@ -184,6 +184,7 @@ static bool zboot_get_image_header(uint32_t offset, zimage_header *header)
 bool zboot_set_coldboot_index(uint8_t index)
 {
    zboot_config config;
+   DEBUG("%s: index\n", __func__, index);
    if(!zboot_get_config(&config))
       return false;
    if (index >= config.count)
@@ -205,6 +206,7 @@ bool zboot_invalidate_index(uint8_t index)
 {
    zboot_config config;
    int32_t sector;
+   DEBUG("%s: index\n", __func__, index);
    if(!zboot_get_config(&config))
       return false;
    if(index >= config.count)
@@ -504,6 +506,54 @@ bool zboot_get_image_info(uint8_t index, uint32_t *version, uint32_t *date,
    if(NULL != description && maxDescriptionLength > 0)
       strncpy(description, header.description, maxDescriptionLength);
 
+   return true;
+}
+
+bool zboot_get_flash_size(uint8_t *size)
+{
+   zboot_rtc_data rtc;
+   DEBUG("%s\n", __func__);
+
+   if(!zboot_get_rtc_data(&rtc))
+   {
+      DEBUG("zboot: Failed to get rtc data\n");
+      return false;
+   }
+
+   if(NULL != size)
+      *size = rtc.spi_size;
+   return true;
+}
+
+bool zboot_get_flash_speed(uint8_t *speed)
+{
+   zboot_rtc_data rtc;
+   DEBUG("%s\n", __func__);
+
+   if(!zboot_get_rtc_data(&rtc))
+   {
+      DEBUG("zboot: Failed to get rtc data\n");
+      return false;
+   }
+
+   if(NULL != speed)
+      *speed = rtc.spi_speed;
+   return true;
+}
+
+bool zboot_get_flash_mode(uint8_t *mode)
+{
+   zboot_rtc_data rtc;
+   DEBUG("%s\n", __func__);
+
+   if(!zboot_get_rtc_data(&rtc))
+   {
+      DEBUG("zboot: Failed to get rtc data\n");
+      return false;
+   }
+
+   if(NULL != mode)
+      *mode = rtc.spi_mode;
    return true;
 }
 
