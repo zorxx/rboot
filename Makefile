@@ -6,12 +6,16 @@ ZTOOL ?= ../ztool/ztool
 ZBOOT_BUILD_BASE ?= build
 ZBOOT_FW_BASE    ?= firmware
 
-ifndef XTENSA_BINDIR
-CC := xtensa-lx106-elf-gcc
-LD := xtensa-lx106-elf-gcc
+ifdef TOOLCHAIN_PREFIX
+CC := $(TOOLCHAIN_PREFIX)gcc
 else
-CC := $(addprefix $(XTENSA_BINDIR)/,xtensa-lx106-elf-gcc)
-LD := $(addprefix $(XTENSA_BINDIR)/,xtensa-lx106-elf-gcc)
+CC := xtensa-lx106-elf-gcc
+endif
+LD := $(CC) 
+
+ifdef XTENSA_BINDIR
+CC := $(addprefix $(XTENSA_BINDIR)/,$(CC))
+LD := $(addprefix $(XTENSA_BINDIR)/,$(LD))
 endif
 
 ifeq ($(V),1)

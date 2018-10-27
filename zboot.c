@@ -39,8 +39,6 @@ zboot_rtc_data rtc;
 zboot_config config;
 zimage_header zheader;
 
-extern void Cache_Read_Enable(uint8_t, uint8_t, uint8_t);
-
 void __attribute__((section(".final.text"))) load_rom(uint32_t start_addr)
 {
    uint32_t readpos = start_addr;

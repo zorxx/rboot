@@ -16,6 +16,7 @@
 #define BUFFER_SIZE 0x1000
 
 // esp8266 built in ROM functions
+extern void Cache_Read_Enable(uint8_t, uint8_t, uint8_t);
 extern uint32_t SPIRead(uint32_t addr, void *outptr, uint32_t len);
 extern uint32_t SPIEraseSector(int);
 extern uint32_t SPIWrite(uint32_t addr, void *inptr, uint32_t len);
@@ -23,6 +24,7 @@ extern void ets_printf(char*, ...);
 extern void ets_delay_us(int);
 extern void ets_memset(void*, uint8_t, uint32_t);
 extern void ets_memcpy(void*, const void*, uint32_t);
+extern void uart_div_modify(int, int);
 
 // functions we'll call by address
 typedef void stage2a(uint32_t);

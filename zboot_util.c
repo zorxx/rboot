@@ -5,6 +5,7 @@
  * Based on rBoot from Richard A. Burton
  */
 #include "esprom.h"
+#include "zboot_private.h"
 #include "zboot_util.h"
 
 #ifndef BOOT_DEFAULT_CONFIG_IMAGE_COUNT

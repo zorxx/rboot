@@ -6,6 +6,7 @@
  */
 #include <stdlib.h>
 #include "zboot-api.h"
+#include "zboot_private.h"
 #include "esprom.h"
 
 #define BIT5 (1 << 5)

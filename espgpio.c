@@ -6,6 +6,7 @@
  */
 #include <stdbool.h>
 #include <stdint.h>
+#include "zboot_private.h"
 #include "zboot.h"
 #include "espgpio.h"
 
