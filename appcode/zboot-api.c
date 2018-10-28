@@ -56,8 +56,20 @@ SpiFlashOpResult spi_flash_erase_sector(uint16_t sec);
 SpiFlashOpResult spi_flash_write(uint32_t des_addr, uint32_t *src_addr, uint32_t size);
 SpiFlashOpResult spi_flash_read(uint32_t src_addr, uint32_t *des_addr, uint32_t size);
 
-bool system_rtc_mem_write(uint8_t des_addr, const void *src_addr, uint16_t save_size);
-bool system_rtc_mem_read(uint8_t des_addr, const void *src_addr, uint16_t save_size);
+#if defined(__esp32__)
+bool system_rtc_mem_write(uint8_t des_addr, const void *src_addr, uint16_t save_size)
+{
+   return false;
+}
+
+bool system_rtc_mem_read(uint8_t des_addr, const void *src_addr, uint16_t save_size)
+{
+   return false;
+}
+#else
+extern bool system_rtc_mem_write(uint8_t des_addr, const void *src_addr, uint16_t save_size);
+extern bool system_rtc_mem_read(uint8_t des_addr, const void *src_addr, uint16_t save_size);
+#endif
 
 /* ----------------------------------------------------------------------------------------
  * Private Helper Functions
